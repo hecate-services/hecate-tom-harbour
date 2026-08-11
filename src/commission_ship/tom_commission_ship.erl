@@ -36,12 +36,15 @@ handle(Payload) -> tom_wire:answer(tom_port:commission(Payload)).
 
 %% @doc The desk.
 -spec at(tom_port:state(), map(), tom_port:now()) -> tom_port:outcome().
-at(State, Payload, Now) ->
+%% NOW IS A MAP, NOT AN INSTANT. Every other desk destructures it; this one
+%% carried it whole into a fact's payload and put `#{tick => _, at => _}' on the
+%% wire where every reader expects a number.
+at(State, Payload, #{at := At}) ->
     asked(State,
           tom_wire:text(<<"house">>, Payload),
           tom_wire:text(<<"ship">>, Payload),
           tom_wire:number(<<"hold">>, Payload),
-          Now).
+          At).
 
 %% Internal
 

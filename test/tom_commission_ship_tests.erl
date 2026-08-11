@@ -18,7 +18,9 @@ port_holding(Ship, Owner) ->
                                          bound_for => undefined, hop => 0,
                                          since => 1}}}.
 
-ask(State, Payload) -> tom_commission_ship:at(State, Payload, 1786530000000).
+%% The desk is handed the port clock, which is a map and not an instant.
+ask(State, Payload) ->
+    tom_commission_ship:at(State, Payload, #{tick => 1, at => 1786530000000}).
 
 %% A house whose ship went down takes up another hull and carries on. Before
 %% this a loss was terminal, and a game that can only end in a dead stop leaves
