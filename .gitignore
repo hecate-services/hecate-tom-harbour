@@ -11,3 +11,5 @@ rebar3.crashdump
 
 # ex_doc / edoc generated output
 /doc/
+_data/
+_loop/

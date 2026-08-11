@@ -1,0 +1,26 @@
+%% -*- mode: erlang -*-
+%%
+%% GENESIS. The hulls this port holds at hop nought.
+%%
+%% APPLIED ONCE AND ONLY ONCE. tom_port takes a hull from here only if its own
+%% record has NEVER mentioned that hull, at any hop, ever. A port that re-seeded
+%% on every boot would mint a second Santa Clara an hour after the first one
+%% sailed, and then the game would have two, which is the classic way to break
+%% exactly-once with a configuration file.
+%%
+%% Ship building is out of scope, so this is the only way a hull comes into
+%% existence. Point one port at this file and the other at nothing, or the same
+%% hull exists twice before anybody has sailed anywhere.
+%%
+%% hop and custodian are written by the port when it takes the hull, so what is
+%% required here is the identity, the title and the capacity. The cargo starts
+%% empty because a good at nought is not in the hold.
+
+[
+ #{<<"ship">> => <<"mri:instance:io.macula/tom/ship/santa_clara">>,
+   <<"owner">> => <<"mri:instance:io.macula/tom/house/raf">>,
+   <<"hold">> => 200.0,
+   <<"cargo">> => #{},
+   <<"hop">> => 0,
+   <<"custodian">> => <<"mri:instance:io.macula/tom/harbour/macao">>}
+].

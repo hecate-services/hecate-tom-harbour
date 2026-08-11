@@ -49,7 +49,7 @@ bad_constants_are_all_named_test() ->
     ?assert(lists:member({bad_config, appetite, undefined}, Problems)).
 
 %% THE GATE. A market that rings is not a market, and this is the whole of the
-%% check: one inequality on four constants, at open, once.
+%% check: one number, at open, once.
 a_ringing_config_is_refused_test() ->
     Ringing = maps:merge(tom_crossing:defaults(),
                          #{stock_sensitivity => 0.9, cover_ticks => 0.5,
@@ -57,7 +57,22 @@ a_ringing_config_is_refused_test() ->
     {error, Problems} = tom_market:open(tom_sim:standing(macao), Ringing),
     ?assertMatch([{gate_not_met, _Rate}], Problems),
     [{gate_not_met, Rate}] = Problems,
-    ?assert(abs(Rate - 2.9454545) < 1.0e-6).
+    ?assert(abs(Rate - 4.6441994) < 1.0e-6).
+
+%% AND ONE THE OLD GATE LET THROUGH. Linearised at the crossing this
+%% configuration scores 0.873 and passes; the step it actually takes from an
+%% empty quay is nearly twice the distance to rest, so a single landing left it
+%% swinging between two heaps forever. The gate that reads the whole band
+%% refuses it at the door, which is the point of reading the whole band.
+a_config_that_only_rings_far_from_rest_is_refused_test() ->
+    Ringing = maps:merge(tom_crossing:defaults(),
+                         #{stock_sensitivity => 0.9, cover_ticks => 1.5,
+                           reserve_ticks => 0.35}),
+    Linearised = 0.9 * 1.8 / 1.85,
+    ?assert(Linearised < 1.0),
+    {error, [{gate_not_met, Rate}]} =
+        tom_market:open(tom_sim:standing(macao), Ringing),
+    ?assert(Rate > 1.0).
 
 %% Integers are welcome at the boundary and are floats from there on, so that
 %% nothing inside can divide two integers and get a surprise.
@@ -133,6 +148,31 @@ a_sighting_touches_only_its_goods_test() ->
     ?assertEqual(tom_market:natural_price(Market, copper),
                  tom_market:natural_price(Sighted, copper)),
     ?assertEqual(tom_sim:goods(), tom_market:goods(Sighted)).
+
+%% THE FAULT THAT DELETED GOODS, through the facade, which is where it was
+%% reachable. A works eating ten million musk a tick makes the natural stock
+%% eighty million; demolish it and the natural stock is thirteen again while
+%% eighty million are still standing on the quay.
+%%
+%% Waiting a settling horizon used to answer thirteen, at the natural price,
+%% with the quay reported at rest. Waiting the same time one tick at a time
+%% answered sixteen million, still draining, which is the truth. The two must
+%% agree, and the port service reaches this every time it settles a market that
+%% has been left alone for a while.
+a_wait_out_of_the_godown_does_not_delete_the_goods_test() ->
+    Works = #{id => big_works, consumes => #{musk => 1.0e7}, yields => #{}},
+    {ok, Raised} = tom_market:open((tom_sim:standing(macao))#{
+                                     factories => [Works]}),
+    Razed = tom_market:demolish_factory(Raised, 0, big_works),
+    Horizon = maps:get(horizon, tom_market:crossing(Razed, musk)),
+    ?assert(tom_market:stock(Razed, musk) > 1.0e7),
+    Straight = tom_market:settle(Razed, Horizon),
+    Stepwise = lists:foldl(fun(Tick, M) -> tom_market:settle(M, Tick) end,
+                           Razed, lists:seq(1, Horizon)),
+    ?assert(near(tom_market:stock(Straight, musk),
+                 tom_market:stock(Stepwise, musk))),
+    ?assert(tom_market:stock(Straight, musk) > 1.0e6),
+    ?assertNot(tom_quay:at_rest(tom_market:quay(Straight, musk))).
 
 %% A works keeps whatever was already on the quay. Only the structure moved.
 raising_a_factory_keeps_the_goods_on_the_quay_test() ->

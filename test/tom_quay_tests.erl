@@ -246,6 +246,55 @@ idle_is_free_test() ->
     ?assert(tom_quay:at_rest(Snapped)),
     ?assertEqual(tom_quay:stock(Quay), tom_quay:stock(Snapped)).
 
+%% THE HORIZON SNAP MUST NOT DELETE GOODS. A quay left holding more than a
+%% godown by a restructure is outside everything that licenses writing the
+%% natural stock down, so it is cranked instead. One call of advance and N calls
+%% of one tick have to land in the same place, and they did not: the one-call
+%% answer used to report a resting quay at its natural price while a million
+%% units went missing, and it was the wrong answer that looked right.
+a_long_wait_is_the_same_as_many_short_ones_test() ->
+    Crossing = crossing(musk),
+    Horizon = maps:get(horizon, Crossing),
+    Cap = maps:get(capacity, Crossing),
+    [?assert(near(tom_quay:stock(tom_quay:advance(config(),
+                                                  at(Crossing, Pile), N)),
+                  tom_quay:stock(cranked(at(Crossing, Pile), N))))
+     || Pile <- [Cap * math:pow(10.0, K) || K <- lists:seq(1, 6)],
+        N <- [1, 17, Horizon - 1, Horizon, Horizon + 1, 3 * Horizon]],
+    ok.
+
+%% And nothing is lost on the way: a quay standing above its godown drains
+%% toward the natural stock rather than being teleported to it.
+a_quay_above_its_godown_drains_rather_than_vanishing_test() ->
+    Crossing = crossing(musk),
+    Sbar = maps:get(natural_stock, Crossing),
+    Piled = at(Crossing, 400.0 * maps:get(capacity, Crossing)),
+    Halfway = tom_quay:advance(config(), Piled, 20),
+    ?assert(tom_quay:stock(Halfway) < tom_quay:stock(Piled)),
+    ?assert(tom_quay:stock(Halfway) > Sbar),
+    ?assertNot(tom_quay:at_rest(Halfway)),
+    Arrived = tom_quay:advance(config(), Piled, 40 * maps:get(horizon,
+                                                              Crossing)),
+    ?assert(tom_quay:at_rest(Arrived)),
+    ?assertEqual(Sbar, tom_quay:stock(Arrived)).
+
+%% A REQUEST FOR NOTHING IS NOT AN EMPTY QUAY. Nought, a negative and an integer
+%% no float can hold all used to come back as quay_empty or godown_full, which
+%% sends a client that retries on those into a loop forever, and the last of the
+%% three used to raise badarith instead. All three are the same fault: a
+%% quantity nobody can fill.
+a_quantity_nobody_can_fill_is_said_so_test() ->
+    Quay = quay(musk),
+    Huge = 1 bsl 4096,
+    [?assertEqual({error, bad_quantity}, tom_quay:lift(config(), Quay, Bad))
+     || Bad <- [0, 0.0, -1, -2.5, not_a_number]],
+    [?assertEqual({error, bad_quantity}, tom_quay:land(config(), Quay, Bad))
+     || Bad <- [0, 0.0, -1, -2.5, not_a_number]],
+    ?assertMatch({ok, _Filled, _Coin, _After}, tom_quay:lift(config(), Quay,
+                                                             Huge)),
+    ?assertMatch({ok, _Filled, _Coin, _After}, tom_quay:land(config(), Quay,
+                                                             Huge)).
+
 %% A tick moves the heap toward the crossing and a trade moves it away, and both
 %% of them together are the whole of what happens at a port.
 a_tick_walks_the_price_back_test() ->

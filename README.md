@@ -1,9 +1,16 @@
 # hecate-tom-harbour
 
-**TOM, Traders of Macao.** One port, and the market behind it.
+**TOM, Traders of Macao.** One port, the market behind it, and the service that
+runs it.
 
-*This exists so that a trader can look at a price and know why it is that
-number.*
+*This exists so that a trader can buy goods in one port, fill a ship, and sell
+them in another.*
+
+Two halves, and they are kept apart on purpose. The **mechanism** is pure
+functions: a market is a term, you pass one in and get one back, and nothing in
+it reads a clock, opens a socket or spawns a process. The **service** is one
+process that holds a market, a clock, a disk and a mesh connection, and every
+call at this harbour serialises through it.
 
 A harbour is a quay, a town behind it, and land behind that. Every good buys and
 sells here at the going price. There is no stock list and no shopping list,
@@ -137,21 +144,49 @@ not a wobble in a heap.
 
 ## What is here
 
+### The mechanism, which is pure
+
 | Module | Is |
 |--------|-----|
-| `tom_market` | **The facade.** The port, its clock, and the folding of facts. The only module a caller needs |
+| `tom_market` | **The facade.** The port, its clock, and the folding of facts |
 | `tom_quay` | One good's stack: its heap, its posted price, its trades, its tick |
 | `tom_crossing` | Where the two curves meet. The long-run structure of one good here |
 
+### The service, which is not
+
+| Module | Is |
+|--------|-----|
+| `hecate_tom_harbour_app` / `_sup` / `_service` | OTP entry, the tree, and the hecate_om contract |
+| `open_the_port/tom_port` | **The one process.** Market, clock, hulls, receipts, disk |
+| `open_the_port/tom_ledger` | What this port must not forget, on a disk, before it answers |
+| `tom_standing` | Which port this instance IS, read from the environment |
+| `tom_ship` | A hull, its hold, and what is in it |
+| `tom_wire` | Binary keys, MRIs, instants: what leaves and what is accepted |
+| `join_the_mesh/tom_advertiser` | The seven procedures, addressed at this instance |
+| `join_the_mesh/tom_crier` | The port's one mouth. Four facts, best effort |
+| `hand_over_ship/tom_hand_over_ship{,_sup}` | One promise per consigned hull, retried forever |
+
+### The desks, one directory each
+
+| Desk | Answers |
+|------|---------|
+| `list_quotes/` | what everything goes for |
+| `quote_purchase/` | what an order would cost, moving nothing |
+| `buy_cargo/` | quay to hold, in one act, idempotent on the order |
+| `sell_cargo/` | hold to quay, in one act, idempotent on the order |
+| `sail_ship/` | promise a hull to the ocean and freeze it |
+| `receive_ship/` | take custody, idempotent on the ship and the hop |
+| `get_ship/` | where a hull is |
+
 | In `test/` | Is |
 |------------|-----|
-| `tom_sim` | A hand crank. Runs a port forward with a script of orders and gives back the price series |
+| `tom_sim` | A hand crank. Runs a port forward with a script of orders |
 
-**A market is a term.** You pass one in and you get one back. Nothing here reads
-a clock, opens a socket or spawns a process, so it is testable and simulatable,
-which is the whole point. The service that owns a market and the slice that
-publishes its facts are somebody else's file, and neither needs anything here to
-change.
+**A desk is a function**, from the port's state and one payload to a reply, a new
+state and a list of things the world must do. `tom_port` is the only thing in the
+service holding a pid, a disk or a socket, so every desk is tested by calling it,
+and the order of the effects is decided in one place: **written down first, said
+out loud second, and only then answered.**
 
 **There is no dependency on `hecate-tom-world`**, and there will not be one. A
 shared domain library is the problem that service exists to avoid. Goods arrive
@@ -206,7 +241,140 @@ verbs and no CRUD: `market_opened`, `cargo_lifted`, `cargo_landed`,
 elapsed time and carries nothing a replay cannot derive, so replay is a fold of
 those six facts with a settle between them.
 
-## Running one
+## What this harbour says on the mesh
+
+Four facts, and **not one of them is load-bearing**. A missed fact costs a page
+update, never a coin and never a ton, because everything that must be true is
+established by a call with a receipt or read back later from the service that
+owns it. That is what lets a player switch off for a voyage and be exactly right
+when he comes back.
+
+| Topic | When |
+|-------|------|
+| `{realm}/tom/harbour/trade/cargo_loaded_v1` | goods went from this quay into a hold |
+| `{realm}/tom/harbour/trade/cargo_discharged_v1` | goods came out of a hold onto this quay |
+| `{realm}/tom/harbour/custody/ship_moored_v1` | this port took custody of a hull |
+| `{realm}/tom/harbour/custody/ship_consigned_v1` | this port promised one away and froze it |
+
+**No identifier is ever in a topic.** The harbour, the ship and the good travel
+in the payload, so a house watching a voyage subscribes to four topics rather
+than four times the number of ports. **This port subscribes to nothing at all.**
+
+The facts are named for what happened to the **ship**; this repository's own
+vocabulary above names what happened to the **quay**. That divergence is
+deliberate: the producer owns the content of what it publishes, and an outsider
+watching a voyage cares that a hold got fuller, not that a heap got shorter.
+
+### Two things the wire does that the contract did not say it did
+
+Both were found by running the four services against a real station, and both
+break the loop silently rather than loudly. They are the reason
+`tom_wire:accept/1` and `tom_wire:answer/1` exist.
+
+**A key does not arrive in the shape it was sent.** The contract says every key
+on the wire is a binary. That is true of what a sender writes and false of what
+a receiver gets. macula encodes a binary key as a CBOR text string, and
+`macula_frame:from_wire_envelope/1` then runs `binary_to_existing_atom` over
+every one: a key whose name is already in the receiving node's atom table
+arrives as an **atom**, one whose name is not arrives as **`{text, Binary}`**.
+Both shapes turn up in one payload, and which shape a given key takes is a
+property of the receiving node rather than of the message — load a module that
+happens to mention the atom `good` and every payload afterwards is shaped
+differently. `tom_wire:accept/1` folds a payload back to binary keys at the one
+place every desk is entered, `tom_port:ask/1`, and mints no atom doing it.
+
+**A refusal's reason does not survive `{error, Binary}`.** macula turns a
+handler's error tuple into a BOLT#4 frame with code `0x0F`, renders the reason
+into the frame's `detail`, and the SDK's caller path reads only the code. So
+`quay_empty`, `hold_full`, `not_here`, `not_yours` and `ship_consigned` all
+reach a house as one indistinguishable `{call_error, 15, unknown_error}`, and a
+player is told an order failed with no way to say why. A refusal therefore
+travels as a **successful reply carrying the reason**:
+
+```erlang
+{ok, #{<<"refused">> => <<"hold_full">>}}
+```
+
+which is the one shape the wire keeps whole. The desks still return
+`{error, Binary}`, because that is what a refusal IS to this port; the
+translation is `tom_wire:answer/1`, at the edge, once. The final-versus-transient
+split a caller retries on is unaffected: a reply is an answer, and a crash or a
+timeout is not.
+
+## The custody rule, as implemented
+
+> **Custody is held by whoever has recorded taking the hull at the highest hop.**
+
+One sentence, and it resolves every crash. There is no vote, no quorum and no
+arbiter, because the hop is monotone and only an acceptance advances it.
+
+- A **consignment is not a hop.** It freezes the hull and obliges this port to
+  keep calling; this port stays the custodian at the old hop until it is told
+  otherwise. If the ocean is down for an hour the hull sits here for an hour,
+  visibly consigned, which is the truth.
+- **Acceptance is durable before the reply.** `tom_port` writes and then answers,
+  never the other way round.
+- `receive_ship` is **idempotent on the ship and the hop, permanently**. A port
+  that ever took a hull at a hop or higher answers `held`, whether or not it
+  still has it, which is what lets a consigner that was down for an hour resolve
+  itself with a retry instead of a reconciliation call nobody wrote.
+- **A well-formed handover is never refused.** There is no final error for it. A
+  receiver that invented one would strand a hull between two custodians.
+- The consigner **drops the hull only after `held`**, then writes its own
+  terminal record and forgets.
+
+## Playing the whole game
+
+```bash
+scripts/play-the-loop.sh          # then open http://localhost:8461
+scripts/play-the-loop.sh stop
+scripts/play-the-loop.sh status
+scripts/play-the-loop.sh wipe     # stop, and throw every ledger away
+```
+
+Five processes: a `macula-station` for them to dial out to, **two harbours**, the
+ocean and the house. They find each other over the mesh and nothing else — no
+Erlang distribution between the services, no shared disk, no shared library.
+Everything it writes lives under `_loop/`.
+
+It expects `hecate-tom-ocean`, `hecate-tom-house` and `macula-io/macula-station`
+checked out beside this repository; override with `TOM_OCEAN_REPO`,
+`TOM_HOUSE_REPO` and `MACULA_STATION_REPO`.
+
+⚠ **The local station is unverified TLS.** It gets a self-signed certificate
+minted by the script and the four services dial it with `verify => none`, which
+the SDK warns about once per link, loudly and correctly. There is no CA on a
+laptop and pinning wants an Ed25519 leaf this certificate has not got. That is
+the one thing this script does differently from a real deployment, where a
+station holds a realm-issued certificate and is verified.
+
+## Opening one port on its own
+
+```bash
+scripts/open-a-port.sh macao
+scripts/open-a-port.sh lisbon
+```
+
+**Which harbour an instance IS comes from the environment and nowhere else.**
+Nothing in the image says Macao, which is what lets one release run two ports.
+
+| Variable | Default | Is |
+|----------|---------|-----|
+| `TOM_HARBOUR` | **none, and it will not start without it** | the port's name: `macao`, `lisbon` |
+| `TOM_REALM_NAME` | `io.macula` | the realm NAME inside every MRI and topic. **Not** the realm tag |
+| `TOM_OCEAN` | `mri:instance:{realm}/tom/ocean` | the ocean. There is one, so the default is derivable |
+| `TOM_STANDING` | `priv/harbours/{harbour}.standing` | what this port declares about itself |
+| `TOM_SHIPS` | none | genesis hulls. **Exactly one port may be given these** |
+| `TOM_DATA_DIR` | `/var/lib/hecate-tom-harbour` | where the record lives. Must outlive the container |
+| `TOM_TICK_MS` | `10000` | how long a tick of the market lasts in wall time |
+| `MACULA_STATION_SEEDS` | none | the station to dial. Without it the port runs dark |
+| `HECATE_REALM` | none | the 32-byte realm TAG, as 64 hex characters, for macula |
+
+A port with no seeds still opens, still trades and still records. It simply has
+nobody to tell, which is exactly the state the contract says no fact may be
+load-bearing in.
+
+## Running the mechanism on its own
 
 ```bash
 scripts/simulate.sh 40
@@ -263,57 +431,123 @@ wool, which puts the base so low that the ratio is real and the absolute margin
 will not pay the freight. That is how a trap good actually works, and it is the
 best the law permits.
 
+## What this harbour answers to
+
+Seven procedures, every one of them **addressed at this instance**:
+
+```
+{realm}/tom/harbour/macao.list_quotes       what everything goes for
+{realm}/tom/harbour/macao.quote_purchase    what an order would cost
+{realm}/tom/harbour/macao.buy_cargo         quay to hold, in one act
+{realm}/tom/harbour/macao.sell_cargo        hold to quay, in one act
+{realm}/tom/harbour/macao.sail_ship         promise a hull to the ocean
+{realm}/tom/harbour/macao.receive_ship      take custody of one
+{realm}/tom/harbour/macao.get_ship          where a hull is
+```
+
+The harbour is in the name because a call has to reach **one** harbour. Macao
+and Lisbon both answer `buy_cargo`, and `macula:call` is first-success across a
+pool's links, so a name that did not carry the harbour would hand a Macao order
+to Lisbon and the coin would be gone.
+
 ## Build
 
 ```bash
-rebar3 eunit
+rebar3 eunit      # 108 tests
 rebar3 lint
 rebar3 dialyzer
+rebar3 release
 ```
 
 ## License
 
 Apache-2.0. See [LICENSE](LICENSE).
 
-## What is known to be wrong
+## What was wrong, and what was done about it
 
-Found by four independent probes against the built code, 2026-08-11. The
-mechanism itself behaves: 192 cases of six ports by eight goods by four starting
-stocks, 1200 ticks each, zero non-monotone steps, zero overshoots, zero
-out-of-band prices, worst residual 9.87e-13. Round trip loses exactly 3.921569%
-at every size in both directions and a 20,000-sequence search found no closing
-cycle, so there is no money pump.
+Four independent probes against the built code, 2026-08-11, found the mechanism
+itself sound: 192 cases of six ports by eight goods by four starting stocks, 1200
+ticks each, zero non-monotone steps, zero overshoots, zero out-of-band prices,
+worst residual 9.87e-13. Round trip loses exactly 3.921569% at every size in both
+directions and a 20,000-sequence search found no closing cycle, so there is no
+money pump.
 
-These three are faults in the collar around it, all reachable through the facade.
+Three faults in the collar around it were recorded. **All three are fixed**, and
+each has a test that fails when the fix is reverted.
 
-**1. The horizon snap deletes goods.** `advance/3` snaps the stock to natural
-whenever the elapsed ticks reach the horizon, without asking whether the quay
-could have got there. After a large works is demolished, `settle(+600)` in one
-call reports stock 13.36 at the natural price and `at_rest` true, while six
-hundred calls of `settle(+1)` give stock 1,398,238 and a price 318x away. Same
-elapsed time, 1.4e6 units of musk deleted, and the wrong answer is the one that
-looks right. Snap only when the stock is inside the range the band and the
-horizon are valid for, and crank otherwise.
+**1. The horizon snap deleted goods. FIXED.** `advance/3` wrote the natural stock
+down whenever the elapsed ticks reached the horizon, without asking whether the
+quay could have got there. Everything that licenses that write, the gate, the
+band, the count of ticks, is an argument about heaps between nothing and a full
+godown, and `re_cross/2` can leave far more than that on a quay. Reproduced at
+scale: a works eating ten million musk a tick, demolished, leaves eighty million
+on the quay; one call of `settle(+1128)` answered 13.36 at the natural price with
+`at_rest` true while 1128 calls of `settle(+1)` answered 15,937,484, still
+draining. Sixteen million units deleted, and the wrong answer looked right.
 
-**2. `sight_harbour/3` moves a price the wrong way on the first news.**
-`abundance/4` cannot tell "surveyed, nobody makes this" from "we have not heard
-yet". Cannon at Macao is 77.22 while nobody is known to make them and 997.37 the
-moment one distant producer is sighted. On a mesh where ports learn
-asynchronously that is a standing 12.9x arbitrage against every port that has not
-caught up, and it rewards trading with the ignorant. Ignorance has to be a state
-in the census, not a value of the count.
+Now a quay outside the godown is **cranked, a horizon at a time, until it is back
+inside one**, and only then is the rest of the wait taken in a comparison. It
+costs what it costs. `at_rest` was also made to mean what it says: a crank that
+arrives within rounding of the fixed point is put **on** it, so the two ways of
+waiting out the same hour cannot differ in the last bits.
 
-**3. The settling gate is advertised as sufficient and is not.** It is the
-linearisation at the fixed point. `open/2` accepts a legal configuration whose
-market never settles: one landing then 3000 idle ticks leaves a permanent
-period-2 cycle. The shipped constants are safe, so this is a guarantee that does
-not exist rather than a market that is broken today, but the snap in fault 1 is
-what turns it into a silent wrong answer.
+**2. `sight_harbour/3` moved a price the wrong way on the first news. FIXED.**
+`abundance` could not tell "surveyed, nobody makes this" from "we have not heard
+yet", so a port's first piece of news sent a good UP thirteenfold. On a mesh
+where ports learn asynchronously that was a standing arbitrage against everyone
+who had not caught up, and it paid to trade with the ignorant.
 
-Untidier, and listed rather than argued: `land/4` raises `badarith` on a bignum
-quantity in a function documented as taking arguments from a stranger;
-`raise_factory/3`, `demolish_factory/3` and `resurvey/3` validate nothing where
-`open/2` returns a problem list; the error vocabulary answers `godown_full` on an
-empty godown and `quay_empty` on a full quay, so a client that retries loops
-forever; and the census only grows, so a harbour that stops producing cannot be
-recorded.
+Ignorance is now **a state in the census rather than a value of the count**. A
+good missing from the census is unsurveyed and gets `leak_base` alone, which is
+exactly what that constant means: what turns up with no known source at all. That
+is the scarce end, so **learning can only ever make a good cheaper here**, never
+dearer, and the port that is behind quotes dear, which costs its owner rather
+than its counterparty. A surveyed `{0, 0}` still means the good has no geography
+and still gets the full artisan rate, so cannon at Macao are unchanged at 77.22.
+
+**3. The settling gate was advertised as sufficient and was not. FIXED.** It was
+the linearisation at the fixed point, which describes the last few ticks of an
+approach and says nothing about the step taken from an empty quay, where the
+largest step is.
+
+The gate now measures **the longest step any tick takes anywhere in the band**,
+as a fraction of the distance it had left, sampled across every heap between an
+empty quay and a full godown. It is still one number checked once at the door,
+because a works can only ever make a step smaller, so the factory-free arithmetic
+bounds every port and every works the game will ever build. With the shipped
+constants it is **0.2407** rather than the linearisation's 0.109, and both pass,
+but only one of them was ever an argument. A configuration that scores 0.873
+linearised and 1.13 across the band is now refused.
+
+The horizon is the same argument read the other way, from the **slowest** step
+rather than the fastest, which is taken from a full godown. It is **1128** ticks
+with the shipped constants, not 600. And because a works contracts a heap more
+slowly than a hungry market does, **every crossing now carries its own horizon**
+rather than there being one on the constants.
+
+Also fixed, from the untidier list: `lift/3` and `land/3` no longer raise
+`badarith` on a quantity no float can hold, and a request for nothing is
+answered `bad_quantity` rather than `quay_empty` on a full quay or `godown_full`
+on an empty one, which used to send a client that reads its own errors into a
+retry loop forever.
+
+Still true and still listed rather than argued: `raise_factory/3`,
+`demolish_factory/3` and `resurvey/3` raise where `open/2` returns a problem
+list, which is defensible while their arguments come from a configuration file
+and not from a stranger; and the census only grows, so a harbour that stops
+producing cannot be recorded.
+
+## What the service does not keep
+
+**The heaps on the quays are rebuilt, not stored.** What survives a restart is
+custody and receipts, which is what exactly-once is about, and they come off the
+ledger. The heaps come back by replaying the settled orders into a market opened
+from the standing, at the ticks those orders happened at, so a port that traded
+comes back where it was and one that never traded comes back at rest, which is
+where it would have been anyway.
+
+What this does **not** recover is a price move caused by something other than a
+trade through this service. There is nothing else in this cut, so today the
+replay is exact. It stops being exact the moment a fact from another service can
+move a crossing, and at that point the six-verb event log the mechanism's own
+vocabulary already anticipates is the answer, not a bigger ledger.

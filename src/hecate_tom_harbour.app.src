@@ -1,8 +1,20 @@
 {application, hecate_tom_harbour, [
     {description, "TOM, Traders of Macao: a port and its market"},
-    {vsn, "0.1.0"},
-    {registered, []},
-    {applications, [kernel, stdlib]},
+    {vsn, "0.2.0"},
+    {registered, [hecate_tom_harbour_sup, tom_port, tom_crier, tom_advertiser,
+                  tom_hand_over_ship_sup]},
+    {mod, {hecate_tom_harbour_app, []}},
+    {applications, [
+        kernel,
+        stdlib,
+        crypto,
+        %% disk_log lives here. It is what this port writes its custody and its
+        %% receipts to, and it is the whole of the persistence story.
+        sasl,
+        %% The shared L2 substrate: mesh SDK, realm identity, capabilities,
+        %% health. Brings macula transitively.
+        hecate_om
+    ]},
     {env, []},
     {modules, []},
     {licenses, ["Apache-2.0"]},

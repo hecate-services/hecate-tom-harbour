@@ -20,42 +20,85 @@ defaults_are_the_shipped_constants_test() ->
                    leak_far => 0.006},
                  config()).
 
-%% Clause one: the hinterland grows it, so the full rate applies and the census
+%% Clause one: the hinterland grows it, so the full rate applies and the survey
 %% is not consulted at all.
 abundance_of_a_local_good_is_whole_test() ->
-    ?assertEqual(1.0, tom_crossing:abundance(config(), true, 0, 0)),
-    ?assertEqual(1.0, tom_crossing:abundance(config(), true, 9, 9)).
+    ?assertEqual(1.0, tom_crossing:abundance(config(), true, {0, 0})),
+    ?assertEqual(1.0, tom_crossing:abundance(config(), true, {9, 9})),
+    ?assertEqual(1.0, tom_crossing:abundance(config(), true, unsurveyed)).
 
-%% Clause two: nobody anywhere produces it. The good has no geography, so the
-%% declared yield already IS the artisan rate everywhere and a trickle here
-%% would be a second discount on top of a rate that is already the low one.
+%% Clause two: the port LOOKED and nobody anywhere produces it. The good has no
+%% geography, so the declared yield already IS the artisan rate everywhere and a
+%% trickle here would be a second discount on top of a rate that is already the
+%% low one.
 abundance_of_a_good_with_no_geography_is_whole_test() ->
-    ?assertEqual(1.0, tom_crossing:abundance(config(), false, 0, 0)).
+    ?assertEqual(1.0, tom_crossing:abundance(config(), false, {0, 0})).
 
 %% Clause three: it comes from somewhere else, and how far away decides how much
 %% of it drifts in. Ten to one between a neighbour and a voyage is the only
 %% place distance is expressed in the whole mechanism.
 abundance_of_an_import_is_a_trickle_test() ->
-    Base = tom_crossing:abundance(config(), false, 0, 1),
-    Near = tom_crossing:abundance(config(), false, 1, 0),
+    Base = tom_crossing:abundance(config(), false, {0, 1}),
+    Near = tom_crossing:abundance(config(), false, {1, 0}),
     ?assertEqual(0.004 + 0.006, Base),
     ?assertEqual(0.004 + 0.060, Near),
     ?assert(Near > Base * 6),
-    ?assert(tom_crossing:abundance(config(), false, 4, 0)
-            > tom_crossing:abundance(config(), false, 1, 0)).
+    ?assert(tom_crossing:abundance(config(), false, {4, 0})
+            > tom_crossing:abundance(config(), false, {1, 0})).
 
-%% The gate is one inequality on four constants, and the number it produces is
-%% the worst case for every port and every works that will ever exist, because
-%% a factory can only ever make the contraction smaller.
-settling_rate_is_the_worst_case_test() ->
-    ?assert(abs(tom_crossing:settling_rate(config()) - 0.5 * 1.8 / 8.25)
-            < 1.0e-15),
-    ?assert(tom_crossing:settling_rate(config()) < 1.0).
+%% IGNORANCE IS THE SCARCE END, AND IT IS A STATE RATHER THAN A COUNT. A port
+%% that has not looked gets what turns up with no known source at all, which is
+%% what leak_base means, and that is BELOW every surveyed answer. So hearing a
+%% fact can only ever raise the abundance and lower the price.
+%%
+%% Without this, ignorance and "surveyed, nobody makes it" were the same value
+%% and a port's price jumped thirteenfold on its first piece of news, which is a
+%% standing arbitrage against every port that had not caught up yet.
+ignorance_is_the_scarce_end_test() ->
+    Blind = tom_crossing:abundance(config(), false, unsurveyed),
+    ?assertEqual(0.004, Blind),
+    ?assert(Blind < tom_crossing:abundance(config(), false, {0, 1})),
+    ?assert(Blind < tom_crossing:abundance(config(), false, {1, 0})),
+    Ladder = [tom_crossing:abundance(config(), false, {0, N})
+              || N <- lists:seq(1, 8)],
+    ?assertEqual(Ladder, lists:sort(Ladder)),
+    ?assert(Blind < hd(Ladder)).
 
-%% Six hundred idle ticks and a quay is at its natural stock to the last bit.
-%% tom_quay_tests proves the horizon is long enough from both ends of the band.
-settling_horizon_is_six_hundred_test() ->
-    ?assertEqual(600, tom_crossing:settling_horizon(config())).
+%% THE GATE MEASURES THE WHOLE BAND, not the crossing. It is the longest step
+%% any tick takes as a fraction of the distance it had left, over every heap
+%% between an empty quay and a full godown, and it must be under one or some
+%% heap overshoots and the market rings.
+%%
+%% The old gate was the linearisation at the crossing, 0.109 with these
+%% constants, which describes the last few ticks of an approach and nothing
+%% else. The real worst step is more than twice that and is taken from an empty
+%% quay. Both numbers pass; only one of them was ever an argument.
+settling_rate_is_the_worst_step_in_the_band_test() ->
+    Rate = tom_crossing:settling_rate(config()),
+    ?assert(abs(Rate - 0.24073022624655652) < 1.0e-12),
+    ?assert(Rate > 0.5 * 1.8 / 8.25),
+    ?assert(Rate < 1.0).
+
+%% Eleven hundred and twenty eight idle ticks and a quay with no works behind it
+%% is at its natural stock to the last bit. Derived from the SLOWEST step in the
+%% band, which is taken from a full godown, and not from the fastest.
+%% tom_quay_tests proves it is long enough from both ends.
+settling_horizon_covers_the_slowest_corner_test() ->
+    ?assertEqual(1128, tom_crossing:settling_horizon(config())).
+
+%% AND EVERY CROSSING CARRIES ITS OWN. A works buys and sells whatever the
+%% price, so its flows do not chase the heap, and a quay whose throughput is
+%% mostly a works takes longer to come to rest. One horizon on the constants
+%% would be too short for it, and too short is what deletes goods.
+a_works_lengthens_the_horizon_test() ->
+    Standing = tom_sim:standing(macao),
+    Bare = tom_crossing:of_good(config(), Standing, cannon),
+    Works = tom_crossing:of_good(config(),
+                                 Standing#{factories => [tom_sim:foundry()]},
+                                 cannon),
+    ?assertEqual(tom_crossing:settling_horizon(config()),
+                 maps:get(horizon, Bare)),
+    ?assert(maps:get(horizon, Works) > maps:get(horizon, Bare)).
 
 %% Eighteen wide, and both ends are algebra rather than a clamp. A famine is not
 %% expressible here and that is a deliberate trade for a bounded step.

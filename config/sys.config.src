@@ -1,0 +1,25 @@
+%% -*- mode: erlang -*-
+%%
+%% Substituted by relx at boot. EVERY ${VAR} MUST RESOLVE or the node will not
+%% start on a malformed term, and that is the correct failure: a port with a
+%% half-configured realm advertises itself where nobody can attribute it, which
+%% looks exactly like a healthy node that nobody is calling.
+%%
+%% WHICH HARBOUR THIS IS DOES NOT LIVE HERE. It comes from TOM_HARBOUR in the
+%% environment, read at boot by tom_standing, because that is what lets one
+%% release run Macao on one box and Lisbon on another. See the README.
+[
+    {hecate_om, [
+        {service_cert_path, "/etc/hecate/secrets/service-cert.pem"},
+        {station_socket,    "/run/macula/station.sock"},
+        {health_port,       ${HECATE_HEALTH_PORT}},
+        {capability_topic,  <<"_mesh.cap.">>},
+        %% THE REALM TAG IS AN APPLICATION ENV, NOT A SHELL VARIABLE, and this
+        %% file is the only place the two meet. It is 32 bytes, or 64 hex
+        %% characters, and it is NOT the realm NAME that goes inside an MRI.
+        %% Exporting one and expecting the other is the classic way to publish
+        %% into a realm nobody is listening to.
+        {realm,             <<"${HECATE_REALM}">>}
+    ]},
+    {kernel, [{logger_level, info}]}
+].

@@ -1,0 +1,52 @@
+%% -*- mode: erlang -*-
+%%
+%% MACAO. What this port declares about itself.
+%%
+%% Read with file:consult/1 and handed straight to tom_market:open/1. One term,
+%% and every field in it is physical.
+%%
+%% NOTHING HERE IS A PRICE, and tom_market drops anything that is not one of the
+%% six words below on the way in. town is a headcount as a multiple of a
+%% standard town; hinterland is an extent of land; a yield is what a standard
+%% hinterland turns out per tick. Not one of them says what anything is worth,
+%% and the exponent between a yield and a price is 0.556, so no yield here could
+%% be nudged toward a price even on purpose.
+%%
+%% THE CENSUS IS SURVEYED AND IT MATTERS THAT IT IS COMPLETE. A good listed here
+%% has been looked for; a good left out has not, and an unsurveyed good is
+%% priced at the scarce end, because the only supply this port knows of is what
+%% turns up with no source at all. cannon are {0, 0} on purpose: this port
+%% looked and no harbour anywhere makes them, so they have no geography and the
+%% declared yield is already the artisan rate everywhere.
+%%
+%% The eight goods are the slice the mechanism's own worked example uses, and
+%% these numbers reproduce it: musk goes for 12.9155 here and 172.90 at Lisbon,
+%% out of a yield and a census and nothing else.
+
+#{town => 2.0,
+  hinterland => 1.2,
+
+  goods => #{rice => 400.0,
+             musk => 0.5,
+             nutmeg => 40.0,
+             copper => 30.0,
+             quicksilver => 1.2,
+             silver_ore => 900.0,
+             cannon => 0.02,
+             tin => 20.0},
+
+  %% The Pearl River mouth. Everything Chinese leaves through here.
+  produces => [musk, quicksilver],
+
+  %% How many OTHER harbours make each good, split into this port's own region
+  %% and everywhere beyond it. Coastal traffic against a voyage.
+  census => #{rice => {0, 3},
+              musk => {1, 0},
+              nutmeg => {0, 4},
+              copper => {0, 2},
+              quicksilver => {1, 0},
+              silver_ore => {0, 2},
+              cannon => {0, 0},
+              tin => {0, 2}},
+
+  factories => []}.

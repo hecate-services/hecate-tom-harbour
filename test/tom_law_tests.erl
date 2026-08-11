@@ -51,9 +51,14 @@ a_smuggled_price_does_not_survive_opening_test() ->
 
 %% And no name in the source is one either. Cheap, and it catches the version of
 %% this that arrives as a helpful new field rather than as an argument.
+%%
+%% Recursive, because the service that grew around the mechanism keeps its desks
+%% in directories of their own and a scan of the top level only would have
+%% stopped covering the code the moment the first one was written.
 no_source_name_declares_a_price_test() ->
-    Sources = filelib:wildcard(filename:join(source_dir(), "*.erl")),
-    ?assert(length(Sources) >= 3),
+    Sources = filelib:wildcard(filename:join([source_dir(), "**", "*.erl"]))
+        ++ filelib:wildcard(filename:join(source_dir(), "*.erl")),
+    ?assert(length(Sources) >= 18),
     [?assertEqual({Path, nomatch}, {Path, re:run(read(Path), Forbidden)})
      || Path <- Sources,
         Forbidden <- ["base_price", "declared_value", "cost_of", "price_of",
@@ -162,11 +167,12 @@ the_foundry_strangles_itself_test() ->
     Shelf = maps:get(natural_stock, tom_market:crossing(After, cannon)),
     ?assert(near_enough(Shelf, 1.929)).
 
-%% IGNORANCE IS NOT SCARCITY HERE, AND THAT IS ON PURPOSE. A count of nought
-%% means the good has no geography at all, which is what cannon are: made in a
-%% factory, produced by no harbour, and priced off the rate a village smith
-%% manages. It is the port that has heard of ONE distant producer that pays
-%% most, and the price falls back as more facts arrive.
+%% A SURVEYED COUNT OF NOUGHT IS NOT SCARCITY, AND THAT IS ON PURPOSE. A port
+%% that looked and found nobody has established that the good has no geography
+%% at all, which is what cannon are: made in a factory, produced by no harbour,
+%% and priced off the rate a village smith manages. Among the goods that DO come
+%% from somewhere, it is the port that has heard of one distant producer that
+%% pays most, and the price falls back as more facts arrive.
 facts_arriving_move_the_price_test() ->
     Ignorant = tom_market:sight_harbour(market(lisbon), 0, #{}),
     One = tom_market:sight_harbour(bare(lisbon), 0, #{nutmeg => far}),
@@ -178,8 +184,28 @@ facts_arriving_move_the_price_test() ->
             > tom_market:natural_price(Four, nutmeg)),
     ?assert(near(tom_market:natural_price(Four, nutmeg),
                  tom_market:natural_price(Ignorant, nutmeg))),
-    ?assert(tom_market:natural_price(bare(lisbon), nutmeg)
-            < tom_market:natural_price(One, nutmeg)).
+    ?assert(near(pbar(lisbon, cannon), grown(lisbon, cannon))).
+
+%% LEARNING ONLY EVER MAKES A GOOD CHEAPER. A port that has not surveyed a good
+%% quotes the dearest price it will ever quote for it, because the only supply
+%% it knows of is what turns up with no source at all, and every harbour it
+%% hears about after that adds to the trickle.
+%%
+%% The old arrangement had ignorance and "surveyed, nobody makes it" share one
+%% value, so a first sighting sent nutmeg at Lisbon UP by a factor of thirteen.
+%% Two ports learning at different times then quoted prices thirteen apart with
+%% nothing between them but a lost packet, and the profit was in trading with
+%% whichever one was behind.
+knowing_more_never_makes_a_good_dearer_test() ->
+    Walk = fun(Where, [Last | _] = Seen) ->
+                   [tom_market:sight_harbour(Last, 0, #{nutmeg => Where})
+                    | Seen]
+           end,
+    Markets = lists:foldl(Walk, [bare(lisbon)], [far, far, near, far]),
+    Prices = [tom_market:natural_price(M, nutmeg)
+              || M <- lists:reverse(Markets)],
+    ?assertEqual(Prices, lists:reverse(lists:sort(Prices))),
+    ?assert(hd(Prices) > lists:last(Prices) * 2.0).
 
 %% A good the port itself grows is never a trickle, whatever the census says.
 what_a_port_grows_is_never_scarce_there_test() ->
@@ -187,10 +213,21 @@ what_a_port_grows_is_never_scarce_there_test() ->
     ?assert(pbar(ayutthaya, rice) < pbar(lisbon, rice) / 10),
     ?assert(pbar(macao, musk) < pbar(lisbon, musk) / 10).
 
+%% The same port with nothing surveyed at all: it knows what it grows and
+%% nothing whatever about anybody else.
 bare(Port) ->
     Standing = tom_sim:standing(Port),
     {ok, Market} = tom_market:open(Standing#{census => #{}}),
     Market.
+
+%% What a good would go for at a port that grew it. Clause two of the abundance
+%% says a good nobody anywhere produces goes for exactly this, wherever you
+%% stand, because there is no geography for a trickle to cross.
+grown(Port, Good) ->
+    Standing = tom_sim:standing(Port),
+    Produces = [Good | maps:get(produces, Standing)],
+    {ok, Market} = tom_market:open(Standing#{produces => Produces}),
+    tom_market:natural_price(Market, Good).
 
 source_dir() ->
     filename:join(code:lib_dir(hecate_tom_harbour), "src").

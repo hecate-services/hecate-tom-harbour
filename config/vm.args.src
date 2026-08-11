@@ -1,0 +1,12 @@
+## The node name carries the harbour, so two ports on one box do not collide
+## and an operator attaching to one knows which quay he is standing on.
+-sname tom_harbour_${TOM_HARBOUR}
+
+-setcookie ${ERLANG_COOKIE}
+
++K true
++A 8
+
+## The port serialises every trade at this harbour through one process, so an
+## unhandled exit in a desk is a fault worth seeing rather than a blip.
+-kernel shell_history enabled

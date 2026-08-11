@@ -77,10 +77,9 @@ open(Crossing) ->
 %% what enforces the ordering; this is what makes the ordering enforceable.
 -spec re_cross(quay(), tom_crossing:crossing()) -> quay().
 re_cross(Quay, Crossing) ->
-    Stock = maps:get(stock, Quay),
-    #{crossing => Crossing,
-      stock => Stock,
-      at_rest => still(Stock, maps:get(natural_stock, Crossing))}.
+    rested(#{crossing => Crossing,
+             stock => maps:get(stock, Quay),
+             at_rest => false}).
 
 %% @doc This quay's crossing.
 -spec crossing(quay()) -> tom_crossing:crossing().
@@ -113,29 +112,56 @@ price_band(Config, Quay) ->
 %%
 %% Lazy, because a port with sixty seven goods should not do sixty seven goods
 %% of arithmetic because somebody looked at it. An idle quay costs nothing, and
-%% one idle past the settling horizon costs one comparison, because the natural
-%% stock is a fixed point and landing on it is exact.
+%% one idle past its own settling horizon costs one comparison, because the
+%% natural stock is a fixed point and landing on it is exact.
+%%
+%% THE HORIZON IS ONLY A HORIZON FROM INSIDE THE GODOWN. Everything that
+%% licenses writing the natural stock down, the gate, the band, the count of
+%% ticks, is an argument about heaps between nothing and a full godown. A
+%% restructure can leave more than that on the quay, because re_cross/2 keeps
+%% the goods that are actually standing there while the crossing underneath them
+%% changes, and a works demolished behind a port can shrink a natural stock by
+%% five orders of magnitude in one call.
+%%
+%% Writing the natural stock down from out there DELETES GOODS. It once turned a
+%% quay holding one million four hundred thousand into one holding thirteen, in
+%% a call that reported the market at rest and at its natural price, and the
+%% wrong answer was the one that looked right. So a quay outside the godown is
+%% cranked, a horizon at a time, until it is back inside one, and only then is
+%% the rest of the wait taken in a single comparison. It costs what it costs.
 -spec advance(tom_crossing:config(), quay(), non_neg_integer()) -> quay().
 advance(_Config, Quay, 0) ->
     Quay;
 advance(_Config, #{at_rest := true} = Quay, _N) ->
     Quay;
 advance(Config, Quay, N) when is_integer(N), N > 0 ->
-    settled(Config, Quay, N, N >= tom_crossing:settling_horizon(Config)).
+    onward(Config, Quay, N, horizon(Quay), inside(Quay)).
 
 %% @doc Take goods off the quay. The price rises as they go.
+%%
+%% A REQUEST FOR NOTHING IS NOT AN EMPTY QUAY, and neither is a request for
+%% minus five or for a number no float can hold. All three used to come back as
+%% quay_empty, which sends a client that reads its own errors into a retry loop
+%% forever, and the third one used to raise badarith halfway through the
+%% arithmetic instead. The order below is what fixes it: the quantity is judged
+%% before anything is multiplied, and a bignum is compared against the heap
+%% rather than converted, so nothing overflows on the way in.
 -spec lift(tom_crossing:config(), quay(), number()) ->
-          fill() | {error, quay_empty}.
-lift(Config, Quay, Requested) ->
-    lifted(Config, Quay, room(Requested * 1.0, maps:get(stock, Quay))).
+          fill() | {error, quay_empty | bad_quantity}.
+lift(Config, Quay, Requested) when is_number(Requested), Requested > 0 ->
+    lifted(Config, Quay, room(Requested, maps:get(stock, Quay)));
+lift(_Config, _Quay, _Requested) ->
+    {error, bad_quantity}.
 
 %% @doc Put goods on the quay. The price falls as they land.
 -spec land(tom_crossing:config(), quay(), number()) ->
-          fill() | {error, godown_full}.
-land(Config, Quay, Requested) ->
+          fill() | {error, godown_full | bad_quantity}.
+land(Config, Quay, Requested) when is_number(Requested), Requested > 0 ->
     Crossing = crossing(Quay),
     Space = maps:get(capacity, Crossing) - maps:get(stock, Quay),
-    landed(Config, Quay, room(Requested * 1.0, Space)).
+    landed(Config, Quay, room(Requested, Space));
+land(_Config, _Quay, _Requested) ->
+    {error, bad_quantity}.
 
 %% @doc What it would take to walk the price to a given number.
 %%
@@ -156,9 +182,21 @@ depth(Config, Quay, ToPrice) ->
 
 still(Stock, Natural) -> abs(Stock - Natural) < ?STILL * Natural.
 
-settled(_Config, Quay, _N, true) ->
+%% Whether the heap is somewhere the horizon argument covers. Below nothing is
+%% impossible, since a tick floors at nought and a lift cannot take more than is
+%% there; above a full godown is reachable only through re_cross/2.
+inside(Quay) -> stock(Quay) =< maps:get(capacity, crossing(Quay)).
+
+%% This crossing's own horizon. A works behind the port lengthens it, because a
+%% flow that ignores the price closes a gap more slowly than one that chases it,
+%% so the number lives on the crossing rather than on the constants.
+horizon(Quay) -> maps:get(horizon, crossing(Quay)).
+
+onward(_Config, Quay, N, Horizon, true) when N >= Horizon ->
     Quay#{stock := maps:get(natural_stock, crossing(Quay)), at_rest := true};
-settled(Config, Quay, N, false) ->
+onward(Config, Quay, N, Horizon, false) when N >= Horizon ->
+    advance(Config, rested(cranked(Config, Quay, Horizon)), N - Horizon);
+onward(Config, Quay, N, _Horizon, _Inside) ->
     rested(cranked(Config, Quay, N)).
 
 cranked(_Config, Quay, 0) -> Quay;
@@ -186,11 +224,24 @@ offtake(Config, Crossing, Price) ->
         * math:pow(Price, -maps:get(demand_elasticity, Config))
         + maps:get(inelastic_demand, Crossing).
 
+%% AT REST MEANS AT THE NATURAL STOCK, and this is what makes the two agree
+%% rather than merely nearly agree. A crank that arrives within rounding of the
+%% fixed point is put ON it, so a quay that reports itself at rest is holding
+%% exactly what a quay at rest holds. Without this, advance/3 short-circuits on
+%% at_rest and hands back a heap a few last bits away from the one it claims,
+%% and the two ways of waiting out the same hour give two different answers.
 rested(Quay) ->
-    Quay#{at_rest := still(maps:get(stock, Quay),
-                           maps:get(natural_stock, crossing(Quay)))}.
+    Natural = maps:get(natural_stock, crossing(Quay)),
+    arrived(Quay, Natural, still(maps:get(stock, Quay), Natural)).
 
-room(Requested, Available) -> max(0.0, min(Requested, Available)).
+arrived(Quay, Natural, true) -> Quay#{stock := Natural, at_rest := true};
+arrived(Quay, _Natural, false) -> Quay#{at_rest := false}.
+
+%% The smaller of what was asked for and what is there, as a float. The minimum
+%% is taken BEFORE the conversion, because an integer larger than any float is a
+%% perfectly good thing for a stranger to ask for and comparing it costs
+%% nothing, while converting it raises badarith.
+room(Requested, Available) -> max(0.0, min(Requested, Available) * 1.0).
 
 lifted(_Config, _Quay, Quantity) when Quantity =< 0.0 ->
     {error, quay_empty};

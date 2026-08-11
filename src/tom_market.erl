@@ -135,7 +135,14 @@ stock(Market, Good) -> tom_quay:stock(quay(Market, Good)).
 %% Guarded rather than clamped: a clock going backwards is a bug in the port
 %% service and a market that quietly accepts one will produce plausible prices
 %% for the rest of the game.
+%%
+%% Settling to the tick it already stands at is free rather than nearly free,
+%% because the port service winds its clock on far more often than a tick
+%% actually turns over and rebuilding sixty seven quays to change nothing is
+%% still rebuilding sixty seven quays.
 -spec settle(market(), integer()) -> market().
+settle(#{tick := Now} = Market, Now) ->
+    Market;
 settle(#{tick := Now} = Market, AtTick)
   when is_integer(AtTick), AtTick >= Now ->
     Config = config(Market),
@@ -176,14 +183,15 @@ depth(Market, Good, ToPrice) ->
 %% mesh. A peer that has not heard of a good is the world service's soft
 %% failure, not a fault.
 -spec lift(market(), tom_crossing:good_id(), number(), integer()) ->
-          {ok, float(), float(), market()} | {error, quay_empty | unknown_good}.
+          {ok, float(), float(), market()}
+              | {error, quay_empty | unknown_good | bad_quantity}.
 lift(Market, Good, Requested, AtTick) ->
     lifting(Market, Good, Requested, AtTick, trades(Market, Good)).
 
 %% @doc Put goods on a quay, at a tick.
 -spec land(market(), tom_crossing:good_id(), number(), integer()) ->
           {ok, float(), float(), market()}
-              | {error, godown_full | unknown_good}.
+              | {error, godown_full | unknown_good | bad_quantity}.
 land(Market, Good, Requested, AtTick) ->
     landing(Market, Good, Requested, AtTick, trades(Market, Good)).
 
@@ -262,8 +270,8 @@ lifting(Market0, Good, Requested, AtTick, true) ->
 
 lifted(Market, Good, {ok, Filled, Coin, Quay}) ->
     {ok, Filled, Coin, restocked(Market, Good, Quay)};
-lifted(_Market, _Good, {error, quay_empty}) ->
-    {error, quay_empty}.
+lifted(_Market, _Good, {error, Why}) ->
+    {error, Why}.
 
 landing(_Market, _Good, _Requested, _AtTick, false) ->
     {error, unknown_good};
@@ -274,8 +282,8 @@ landing(Market0, Good, Requested, AtTick, true) ->
 
 landed(Market, Good, {ok, Filled, Coin, Quay}) ->
     {ok, Filled, Coin, restocked(Market, Good, Quay)};
-landed(_Market, _Good, {error, godown_full}) ->
-    {error, godown_full}.
+landed(_Market, _Good, {error, Why}) ->
+    {error, Why}.
 
 restocked(Market, Good, Quay) ->
     Market#{quays := maps:put(Good, Quay, maps:get(quays, Market))}.
@@ -369,16 +377,24 @@ above_one(Value) -> is_number(Value) andalso Value > 1.
 
 bounded_fee(Value) -> is_number(Value) andalso Value >= 0 andalso Value < 1.
 
-%% THE GATE. One inequality on four constants, checked once, covering every port
-%% and every works the game will ever build, because a factory only ever makes
-%% the contraction smaller. Above one a market rings; above two it diverges.
+%% THE GATE. One number, checked once, covering every port and every works the
+%% game will ever build: the longest step any tick takes anywhere in the band,
+%% as a fraction of the distance it had left. At or above one some heap
+%% overshoots and the market rings rather than settling.
+%%
+%% It used to be the linearisation at the crossing, which is the behaviour of
+%% the last few ticks of an approach and says nothing about the step taken from
+%% an empty quay. That gate passed configurations whose markets never settled.
 gate_problems(Config) ->
     Sound = fun({Key, Test}) -> Test(maps:get(Key, Config, undefined)) end,
     gate(Config, lists:all(Sound, gate_rules())).
 
+%% godown_multiple is here because the gate now scans the WHOLE band and the
+%% godown is where the band ends. The old gate read only the crossing and could
+%% get away without it.
 gate_rules() ->
     Wanted = [stock_sensitivity, demand_elasticity, supply_elasticity,
-              cover_ticks, reserve_ticks],
+              cover_ticks, reserve_ticks, godown_multiple],
     [Rule || {Key, _Test} = Rule <- config_rules(), lists:member(Key, Wanted)].
 
 gate(_Config, false) -> [];

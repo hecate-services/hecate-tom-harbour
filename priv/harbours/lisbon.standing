@@ -1,0 +1,39 @@
+%% -*- mode: erlang -*-
+%%
+%% LISBON. What this port declares about itself.
+%%
+%% The far end of the run, and it produces NOTHING out of the eight goods, which
+%% is legitimate and is most of the point: a port can be rich and make nothing.
+%% Everything it sells arrived in somebody's hold, and everything it buys is
+%% dear because it came a long way. That is the census talking and not an
+%% author: every producer of every good here is beyond this port's region, so
+%% each of them arrives at the far trickle rather than the near one, and nutmeg
+%% is 8.55 here against 0.75 where it grows.
+%%
+%% See macao.standing for what each field means and why none of them is a price.
+
+#{town => 1.6,
+  hinterland => 0.9,
+
+  goods => #{rice => 400.0,
+             musk => 0.5,
+             nutmeg => 40.0,
+             copper => 30.0,
+             quicksilver => 1.2,
+             silver_ore => 900.0,
+             cannon => 0.02,
+             tin => 20.0},
+
+  produces => [],
+
+  %% Europe. Nobody in this region makes any of it, so every count is far.
+  census => #{rice => {0, 3},
+              musk => {0, 1},
+              nutmeg => {0, 4},
+              copper => {0, 2},
+              quicksilver => {0, 1},
+              silver_ore => {0, 2},
+              cannon => {0, 0},
+              tin => {0, 2}},
+
+  factories => []}.
