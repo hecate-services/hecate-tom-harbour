@@ -41,6 +41,7 @@
          sail/1,
          take/1,
          berth/1,
+         commission/1,
          handed/2,
          harbour/0,
          market/0]).
@@ -144,6 +145,10 @@ take(Payload) -> ask({receive_ship, Payload}).
 -spec berth(map()) -> {ok, map()} | {error, binary()}.
 berth(Payload) -> ask({get_ship, Payload}).
 
+%% @doc A house that has lost its ship takes up another hull here.
+-spec commission(map()) -> {ok, map()} | {error, binary()}.
+commission(Payload) -> ask({commission_ship, Payload}).
+
 %% @doc The receiver said held. Let the hull go.
 -spec handed(binary(), integer()) -> ok.
 handed(Ship, Hop) -> gen_server:cast(?MODULE, {handed, Ship, Hop}).
@@ -219,7 +224,9 @@ desk(buy_cargo, State, Payload) -> tom_buy_cargo:at(State, Payload, now_at(State
 desk(sell_cargo, State, Payload) -> tom_sell_cargo:at(State, Payload, now_at(State));
 desk(sail_ship, State, Payload) -> tom_sail_ship:at(State, Payload, now_at(State));
 desk(receive_ship, State, Payload) -> tom_receive_ship:at(State, Payload, now_at(State));
-desk(get_ship, State, Payload) -> tom_get_ship:at(State, Payload, now_at(State)).
+desk(get_ship, State, Payload) -> tom_get_ship:at(State, Payload, now_at(State));
+desk(commission_ship, State, Payload) ->
+    tom_commission_ship:at(State, Payload, now_at(State)).
 
 %% THE ORDER OF THESE THREE IS THE CONTRACT. On the disk, then on the mesh, then
 %% in the answer. A reply that outran its own record is a promise this port

@@ -45,7 +45,8 @@ procedures() ->
      {<<"sell_cargo">>, {tom_sell_cargo, handle}},
      {<<"sail_ship">>, {tom_sail_ship, handle}},
      {<<"receive_ship">>, {tom_receive_ship, handle}},
-     {<<"get_ship">>, {tom_get_ship, handle}}].
+     {<<"get_ship">>, {tom_get_ship, handle}},
+     {<<"commission_ship">>, {tom_commission_ship, handle}}].
 
 init([]) ->
     self() ! advertise,
