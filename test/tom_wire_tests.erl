@@ -51,7 +51,22 @@ a_fact_carries_no_identifier_test() ->
                   <<"io.macula/tom/harbour/custody/ship_consigned_v1">>],
                  Topics),
     [?assertEqual(nomatch, binary:match(Topic, <<"macao">>))
-     || Topic <- Topics].
+     || Topic <- [tom_wire:fact(?REALM, <<"ocean">>, <<"voyage">>,
+                                <<"landfall_made">>) | Topics]].
+
+%% WHAT THIS PORT SAYS, AND HOW IT NAMES WHAT SOMEBODY ELSE SAYS. `fact/3'
+%% hardcodes this application's own segment, which is right for the four facts
+%% this port publishes and wrong for the one it now listens to: the sea's
+%% landfall lives under the sea's segment, and a topic built with `harbour' in
+%% it is a topic nobody publishes on. Subscribing to it would fail in the one
+%% way that looks exactly like a healthy port: no error, no log line, no ship.
+a_fact_somebody_else_publishes_carries_their_name_test() ->
+    ?assertEqual(<<"io.macula/tom/ocean/voyage/landfall_made_v1">>,
+                 tom_wire:fact(?REALM, <<"ocean">>, <<"voyage">>,
+                               <<"landfall_made">>)),
+    ?assertEqual(tom_wire:fact(?REALM, <<"custody">>, <<"ship_moored">>),
+                 tom_wire:fact(?REALM, <<"harbour">>, <<"custody">>,
+                               <<"ship_moored">>)).
 
 %% A PARSE AND NOT A LOOKUP. Nagasaki is accepted although this port has never
 %% heard of it; the ocean, a house, a class and a bare word are not, because

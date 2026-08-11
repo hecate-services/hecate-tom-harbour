@@ -41,13 +41,21 @@ capabilities() ->
      || {Name, _Handler} <- tom_advertiser:procedures()].
 
 %% THE AUTHORITY THIS SERVICE ASKS FOR, and deliberately nothing else. It
-%% publishes four facts and answers seven calls, all under its own harbour's
-%% name, and it subscribes to nothing at all: facts flow one way, from the
-%% always-on services to a player's page.
+%% publishes four facts and answers seven calls under its own harbour's name,
+%% and it listens to exactly one thing: the sea saying a ship has landed here.
+%%
+%% THAT ONE SUBSCRIPTION IS NOT A CHANNEL FOR ANYTHING TO ARRIVE ON. A harbour
+%% has no say in whether a ship turns up, so nobody hands it one; the
+%% announcement is a nudge that makes this port ask the sea what it has landed
+%% here, and the ask is the only way a hull gets in. The sea's procedure is
+%% listed for the same reason: this port DIALS the sea, and the sea never dials
+%% back.
 identity_spec() ->
     #{scope => <<"hecate-tom-harbour">>,
-      actions => [<<"publish">>, <<"advertise">>, <<"call">>],
+      actions => [<<"publish">>, <<"advertise">>, <<"call">>,
+                  <<"subscribe">>],
       resources => [tom_standing:harbour(),
+                    tom_standing:ocean(),
                     tom_wire:fact(tom_standing:realm(), <<"trade">>,
                                   <<"cargo_loaded">>),
                     tom_wire:fact(tom_standing:realm(), <<"trade">>,
@@ -55,7 +63,9 @@ identity_spec() ->
                     tom_wire:fact(tom_standing:realm(), <<"custody">>,
                                   <<"ship_moored">>),
                     tom_wire:fact(tom_standing:realm(), <<"custody">>,
-                                  <<"ship_consigned">>)],
+                                  <<"ship_consigned">>),
+                    tom_wire:fact(tom_standing:realm(), <<"ocean">>,
+                                  <<"voyage">>, <<"landfall_made">>)],
       ttl_days => 30}.
 
 %% Internal

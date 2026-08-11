@@ -1,34 +1,31 @@
-%% @doc Take custody of a hull somebody is handing over.
+%% @doc Take custody of a hull that has landed here.
 %%
-%% ACCEPTANCE IS THE COMMIT POINT AND IT IS DURABLE BEFORE THE REPLY. tom_port
-%% writes this desk's record to the disk and only then answers. Never the other
-%% way round: an answer that outran its own record tells a consigner to let go
-%% of a hull this port is about to forget, and then the hull is nowhere.
+%% NOBODY CALLS THIS DESK. A harbour is infrastructure and has no say in whether
+%% a ship turns up: she is this port's from the instant the sea says so, whether
+%% or not this port has heard yet. So there is no procedure here for a stranger
+%% to dial and no negotiation to be had. The one way in is tom_take_landings,
+%% which hears the sea's announcement and asks the sea for what it has landed
+%% here, and both halves of that end at `at/3'.
+%%
+%% TAKING IS THE COMMIT POINT AND IT IS DURABLE BEFORE THE REPLY. tom_port writes
+%% this desk's record to the disk and only then answers. Never the other way
+%% round: an answer that outran its own record would advance a cursor over a hull
+%% this port is about to forget, and then the hull is nowhere.
 %%
 %% IDEMPOTENT ON THE SHIP AND THE HOP, AND THE ANSWER IS PERMANENT. A port that
 %% has EVER recorded taking this hull at this hop or higher answers held,
-%% whether or not it still has it. That is what lets a consigner that was down
-%% for an hour resolve itself with a retry instead of a reconciliation call, and
-%% it is why the record of a taking is never pruned.
+%% whether or not it still has it, and writes nothing the second time. That is
+%% what makes hearing an announcement, asking for the same landing, and doing
+%% both, one single take, and it is why the record of a taking is never pruned.
 %%
-%% THERE IS NO REFUSAL FOR A WELL FORMED HANDOVER, and that is not politeness,
-%% it is the custody rule. A receiver that invented one would strand a hull
-%% between two custodians, with the consigner having promised it away and
-%% nobody having taken it. The only thing answered with an error here is a
-%% payload that is not a hull at all, which cannot be taken custody of because
-%% there is nothing to take.
-%%
-%% `to' IS INFORMATIONAL. The procedure is addressed at this instance and only
-%% this instance advertises it, so whoever answers IS the receiver. The custodian
-%% written down is this port's own name, because that is the fact.
+%% THE ONLY REFUSAL IS A PAYLOAD THAT IS NOT A HULL, which cannot be taken
+%% custody of because there is nothing there to take. It is final rather than
+%% transient: the same landing offered again will never become takeable, so the
+%% walk says so out loud and steps past it rather than wedging behind it.
 %% @end
 -module(tom_receive_ship).
 
--export([handle/1, at/3]).
-
-%% @doc The mesh handler.
--spec handle(map()) -> {ok, map()}.
-handle(Payload) -> tom_wire:answer(tom_port:take(Payload)).
+-export([at/3]).
 
 %% @doc The desk.
 -spec at(tom_port:state(), map(), tom_port:now()) -> tom_port:outcome().
@@ -50,7 +47,7 @@ formed(State, Now, Hull, From, true) ->
 
 %% A repeat is answered from the record and nothing is written or said again.
 %% The instant is the instant of the answer, not of the original taking, because
-%% the consigner is asking whether this port holds it NOW.
+%% what is being asked is whether this port holds her NOW.
 already(State, #{at := At}, _Hull, _From, Hop, true) ->
     {{ok, #{<<"held">> => true, <<"hop">> => Hop, <<"at">> => At}}, State, []};
 already(State, #{at := At}, Hull, From, Hop, false) ->

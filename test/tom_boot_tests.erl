@@ -38,7 +38,9 @@ boot_test_() ->
               {"the mesh edge reads a payload shaped the way one arrives",
                fun() -> the_edge_reads_a_wire_payload() end},
               {"and hands a refusal back with its reason on it",
-               fun() -> the_edge_answers_with_a_reason() end}]
+               fun() -> the_edge_answers_with_a_reason() end},
+              {"the ears survive a boot with no sea to listen to",
+               fun() -> the_ears_survive_a_dark_mesh() end}]
      end}.
 
 %% Fixture
@@ -169,6 +171,31 @@ the_edge_answers_with_a_reason() ->
                      {text, <<"ship">>} => Stranger,
                      good => ?MUSK,
                      {text, <<"quantity">>} => 1.0})).
+
+%% THE CASE THE PURE TESTS CANNOT FAKE. tom_take_landings is the one process
+%% here that reaches for a subscription and for another service's procedure, and
+%% both are absent in this run: no seeds are configured, so hecate_om hands back
+%% no client. A port with no sea must still open, still trade and still answer,
+%% which is the same promise the crier and the advertiser already keep.
+%%
+%% BOTH TIMERS ARE DRIVEN BY HAND rather than waited on. `bind' and `look' are
+%% exactly the messages the five-second rebind and the thirty-second sweep
+%% deliver, so sending them exercises the identical clauses without putting half
+%% a minute of sleeping into every run. The synchronous call afterwards is the
+%% assertion: a gen_server answers it only after it has processed everything in
+%% front of it, so a process that died on either message cannot pass this.
+the_ears_survive_a_dark_mesh() ->
+    Ears = whereis(tom_take_landings),
+    ?assert(is_pid(Ears)),
+    Ears ! bind,
+    Ears ! look,
+    ?assertEqual({error, unknown_call},
+                 gen_server:call(tom_take_landings, ping, 10000)),
+    ?assertEqual(Ears, whereis(tom_take_landings)),
+    %% And nothing about a dark mesh has touched the port: the hull is where the
+    %% last case left it, still consigned, still this port's custody.
+    ?assertMatch({ok, #{<<"state">> := <<"consigned">>}},
+                 tom_port:berth(#{<<"ship">> => ?CLARA})).
 
 %% Helpers
 

@@ -137,7 +137,8 @@ sell(Payload) -> ask({sell_cargo, Payload}).
 -spec sail(map()) -> {ok, map()} | {error, binary()}.
 sail(Payload) -> ask({sail_ship, Payload}).
 
-%% @doc Take custody of a hull somebody is handing over.
+%% @doc Take custody of a hull the sea has landed here. Offered by
+%% tom_take_landings and by nothing else: no stranger calls this.
 -spec take(map()) -> {ok, map()} | {error, binary()}.
 take(Payload) -> ask({receive_ship, Payload}).
 
@@ -381,9 +382,15 @@ let_go(State, Ship, Hop, Berth) ->
                             maps:get(consigned_to, Berth), tom_wire:now_ms()}),
     State#{ships := maps:remove(Ship, maps:get(ships, State))}.
 
-%% THE ONE PLACE A PAYLOAD COMES IN FROM THE MESH. All seven desks are reached
+%% THE ONE PLACE A PAYLOAD COMES IN FROM THE MESH. All eight desks are reached
 %% through here, so this is where a payload is put back into the shape the desks
 %% read: binary keys, whatever the codec did to them on the way. See
 %% tom_wire:accept/1 for what the codec does and why it is not the same twice.
+%%
+%% SEVEN OF THEM ARRIVE AS A CALL SOMEBODY MADE and the eighth, receive_ship,
+%% arrives inside an answer THIS port asked for. Both came off the wire and both
+%% took the same beating from the codec, so both are folded here, once. Folding
+%% an already-folded payload is a no-op, which is what lets the reader at the
+%% edge of the walk do its own without this one having to know.
 ask({Desk, Payload}) ->
     gen_server:call(?MODULE, {Desk, tom_wire:accept(Payload)}, ?DESK_MS).

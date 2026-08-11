@@ -165,6 +165,7 @@ not a wobble in a heap.
 | `join_the_mesh/tom_advertiser` | The seven procedures, addressed at this instance |
 | `join_the_mesh/tom_crier` | The port's one mouth. Four facts, best effort |
 | `hand_over_ship/tom_hand_over_ship{,_sup}` | One promise per consigned hull, retried forever |
+| `receive_ship/tom_take_landings` | The port's ears. Hears a landfall, asks the sea what landed here |
 
 ### The desks, one directory each
 
@@ -175,7 +176,7 @@ not a wobble in a heap.
 | `buy_cargo/` | quay to hold, in one act, idempotent on the order |
 | `sell_cargo/` | hold to quay, in one act, idempotent on the order |
 | `sail_ship/` | promise a hull to the ocean and freeze it |
-| `receive_ship/` | take custody, idempotent on the ship and the hop |
+| `receive_ship/` | take custody of a hull the sea landed here, idempotent on the ship and the hop. **Nobody calls it**: it is entered from the sea's announcement and from this port's own catch-up ask |
 | `get_ship/` | where a hull is |
 
 | In `test/` | Is |
@@ -258,7 +259,7 @@ when he comes back.
 
 **No identifier is ever in a topic.** The harbour, the ship and the good travel
 in the payload, so a house watching a voyage subscribes to four topics rather
-than four times the number of ports. **This port subscribes to nothing at all.**
+than four times the number of ports.
 
 The facts are named for what happened to the **ship**; this repository's own
 vocabulary above names what happened to the **quay**. That divergence is
@@ -301,27 +302,86 @@ translation is `tom_wire:answer/1`, at the edge, once. The final-versus-transien
 split a caller retries on is unaffected: a reply is an answer, and a crash or a
 timeout is not.
 
+## What this harbour listens to
+
+One topic, and it is the sea's:
+
+| Topic | Means |
+|-------|-------|
+| `{realm}/tom/ocean/voyage/landfall_made_v1` | a ship has landed somewhere. If it is here, look now |
+
+**A harbour is infrastructure and has no say in whether a ship turns up.** She is
+this port's from the instant the sea says so, whether or not this port has heard
+yet. Arrival is a statement, not a transaction between two parties, so nobody
+knocks here: the port finds out for itself, two ways that end at the same desk.
+
+- **It hears.** A landfall bound for this port arms a look in one second, so a
+  burst of announcements is one walk.
+- **It asks.** Every thirty seconds, unconditionally, and once at boot, it calls
+  the sea's `landings_at` and takes whatever it has not taken. That is what a
+  port that was switched off for a week does, and it is the same code path an
+  ordinary Tuesday afternoon uses. A recovery path that only runs after an
+  outage is a broken recovery path nobody notices.
+
+**The fact is a nudge and never a delivery.** `landfall_made_v1` carries the ship
+as a bare identifier, so hearing one changes *when* this port asks, never *what*
+it believes. Cargo manifests stay off a broadcast topic, and a forged fact
+carries no authority: the worst a stranger can do is make this port ask its own
+configured ocean a question whose answer is the same as it would have been.
+
+**And the ask is a read, not a handshake.** Nobody is waiting on the answer and
+nothing retries until acknowledged. The sea stores nothing about this port; its
+state after answering equals its state before. The tick is not armed because
+something is outstanding and does not stop when something is acknowledged, so a
+port with nothing owed to it asks exactly as often as one that missed a week, and
+gets an empty list.
+
+**What it remembers is in memory only, and it is not the authority.** The ledger
+is: `taken` is durable, never pruned, and rebuilt at boot. The cursor on top of
+it is a bandwidth bound, so a restarted port walks the sea's whole history of
+landings here again and every take after the first writes nothing and says
+nothing. That costs one walk per restart and buys no second clock in the port's
+record and no extra fsync per arrival.
+
 ## The custody rule, as implemented
 
 > **Custody is held by whoever has recorded taking the hull at the highest hop.**
 
 One sentence, and it resolves every crash. There is no vote, no quorum and no
-arbiter, because the hop is monotone and only an acceptance advances it.
+arbiter, because the hop is monotone and only a durable taking advances it.
+
+**The two directions are not symmetrical, and that is the whole design.** Leaving
+a port is a **command** this port issues and must see acknowledged. Arriving at a
+port is a **statement** the sea makes and nobody has to agree to.
+
+*Leaving here, toward the sea:*
 
 - A **consignment is not a hop.** It freezes the hull and obliges this port to
   keep calling; this port stays the custodian at the old hop until it is told
   otherwise. If the ocean is down for an hour the hull sits here for an hour,
   visibly consigned, which is the truth.
-- **Acceptance is durable before the reply.** `tom_port` writes and then answers,
+- The consigner **retries until `held`**, then drops the hull, writes its own
+  terminal record and forgets. Retrying a **command** until it is acknowledged is
+  not the same as asking permission, which is why this half keeps its loop.
+
+*Arriving here, from the sea:*
+
+- **A harbour has no say in whether a ship turns up.** It does not accept her, it
+  receives her, and she is this port's from the moment the sea says so, whether
+  or not this port has heard yet. There is no acceptance, so there is no state
+  meaning "arrived but not yet accepted" and nothing anywhere is waiting.
+- The port **finds out for itself**, by listening and by asking. Neither is a
+  handshake and neither stops when somebody acknowledges.
+- **Taking is durable before the reply.** `tom_port` writes and then answers,
   never the other way round.
 - `receive_ship` is **idempotent on the ship and the hop, permanently**. A port
   that ever took a hull at a hop or higher answers `held`, whether or not it
-  still has it, which is what lets a consigner that was down for an hour resolve
-  itself with a retry instead of a reconciliation call nobody wrote.
-- **A well-formed handover is never refused.** There is no final error for it. A
-  receiver that invented one would strand a hull between two custodians.
-- The consigner **drops the hull only after `held`**, then writes its own
-  terminal record and forgets.
+  still has it, and writes nothing the second time. Heard, asked for, or both, it
+  is **one take**: the ledger is the authority and the cursor is only a bandwidth
+  bound on top of it.
+- **The only refusal is a payload that is not a hull**, and it is final rather
+  than transient. That landing can never become takeable, so the walk says so out
+  loud and steps past it rather than wedging every later ship behind it.
 
 ## Playing the whole game
 
@@ -441,8 +501,8 @@ Seven procedures, every one of them **addressed at this instance**:
 {realm}/tom/harbour/macao.buy_cargo         quay to hold, in one act
 {realm}/tom/harbour/macao.sell_cargo        hold to quay, in one act
 {realm}/tom/harbour/macao.sail_ship         promise a hull to the ocean
-{realm}/tom/harbour/macao.receive_ship      take custody of one
 {realm}/tom/harbour/macao.get_ship          where a hull is
+{realm}/tom/harbour/macao.commission_ship   a house that lost its ship takes up another
 ```
 
 The harbour is in the name because a call has to reach **one** harbour. Macao
@@ -450,10 +510,18 @@ and Lisbon both answer `buy_cargo`, and `macula:call` is first-success across a
 pool's links, so a name that did not carry the harbour would hand a Macao order
 to Lisbon and the coin would be gone.
 
+**Every one of them is a thing a house asks this port to do, and there is no
+eighth for arrivals.** A ship landing here is not a call anybody makes; see
+[what this harbour listens to](#what-this-harbour-listens-to).
+
+The one procedure this port **calls** on somebody else, besides handing a hull to
+the sea, is `{realm}/tom/ocean.landings_at`: what have you landed at me since,
+answered as a page, waited on by nobody.
+
 ## Build
 
 ```bash
-rebar3 eunit      # 108 tests
+rebar3 eunit      # 135 tests
 rebar3 lint
 rebar3 dialyzer
 rebar3 release

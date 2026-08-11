@@ -33,7 +33,8 @@
          instance/3,
          is_harbour/1,
          procedure/2,
-         fact/3]).
+         fact/3,
+         fact/4]).
 
 %% The organisation every topic this game publishes under. One game, one word.
 -define(ORG, <<"tom">>).
@@ -157,8 +158,19 @@ procedure(InstanceMRI, Name) -> macula_mri:derive_procedure(InstanceMRI, Name).
 %% hundred hulls has eight hundred topics, and a house that wants to watch its
 %% own ship has to subscribe to all of them.
 -spec fact(binary(), binary(), binary()) -> binary().
-fact(Realm, Domain, Name) ->
-    macula_topic:app_fact(Realm, ?ORG, <<"harbour">>, Domain, Name, ?SHAPE).
+fact(Realm, Domain, Name) -> fact(Realm, <<"harbour">>, Domain, Name).
+
+%% @doc Where somebody else's fact goes.
+%%
+%% THE APP SEGMENT IS WHOSE FACT IT IS. `fact/3' is what this port SAYS and
+%% hardcodes its own segment; this is how it NAMES what another service says, so
+%% that the sea's landfall is looked for under the sea's name rather than under
+%% this port's. A topic built with the wrong segment is a topic nobody publishes
+%% on, and subscribing to one fails in the only way that is hard to see: no
+%% error, no log line, and no ship.
+-spec fact(binary(), binary(), binary(), binary()) -> binary().
+fact(Realm, App, Domain, Name) ->
+    macula_topic:app_fact(Realm, ?ORG, App, Domain, Name, ?SHAPE).
 
 %% Internal
 
