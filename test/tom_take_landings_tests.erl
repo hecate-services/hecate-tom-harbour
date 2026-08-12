@@ -262,3 +262,43 @@ now_at() -> #{tick => 178652880, at => 1786528800000}.
 order(Key, Quantity) ->
     #{<<"order">> => Key, <<"by">> => ?HOUSE, <<"ship">> => ?CLARA,
       <<"good">> => ?MUSK, <<"quantity">> => Quantity}.
+
+%%% The doorbell wire ---------------------------------------------------
+
+%% THE ONE PATH WITH NOTHING GUARDING IT, until now.
+%%
+%% A port has two ways of learning a ship arrived: the announcement, which takes
+%% about a second, and the sweep, which takes up to thirty. The announcement is
+%% the whole reason this slice exists.
+%%
+%% The pool can drop a subscription on a reconnect, and the clause that notices
+%% and signs up again could be deleted without a single test failing, because the
+%% sweep would go on delivering every ship. Arrivals would quietly go from one
+%% second to thirty and nobody would be told. That is the worst kind of
+%% regression: correct output, silently slower, no alarm.
+a_dropped_subscription_is_noticed_test_() ->
+    {timeout, 15,
+     fun() ->
+         State = listening_state(),
+         {noreply, After} =
+             tom_take_landings:handle_info({macula_event_gone, make_ref(), closed},
+                                           State),
+         %% It knows it is deaf.
+         ?assertEqual(undefined, maps:get(sub, After)),
+         %% And it has arranged to do something about it. Nothing else in this
+         %% process sends itself `bind'.
+         receive
+             bind -> ok
+         after 10000 ->
+             erlang:error(never_tried_to_listen_again)
+         end
+     end}.
+
+
+listening_state() ->
+    #{harbour => ?LISBON,
+      topic => <<"tom/ocean/voyage/landfall_made">>,
+      procedure => <<"tom.ocean.tell_landings">>,
+      sub => make_ref(),
+      look => undefined,
+      since => 0}.
