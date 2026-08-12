@@ -1,4 +1,4 @@
-# hecate-tom-harbour
+# hecate-tom-world
 #
 # TOM, Traders of Macao: one port and its market.
 #
@@ -35,14 +35,14 @@ COPY src ./src
 RUN rebar3 as prod release
 
 FROM docker.io/alpine:3.22
-LABEL org.opencontainers.image.source="https://github.com/hecate-services/hecate-tom-harbour"
+LABEL org.opencontainers.image.source="https://github.com/hecate-services/hecate-tom-world"
 RUN apk add --no-cache ncurses-libs libstdc++ libgcc openssl ca-certificates curl
 WORKDIR /app
-COPY --from=builder /build/_build/prod/rel/hecate_tom_harbour ./
+COPY --from=builder /build/_build/prod/rel/hecate_tom_world ./
 
 ENV HOME=/app
 ENV RELX_REPLACE_OS_VARS=true
-ENV ERLANG_COOKIE=hecate_tom_harbour
+ENV ERLANG_COOKIE=hecate_tom_world
 ENV HECATE_HEALTH_PORT=8477
 
 # THIS PORT KEEPS A RECORD AND IT MUST OUTLIVE THE CONTAINER. Custody and
@@ -57,4 +57,4 @@ EXPOSE 8477
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
     CMD curl -fsS "http://127.0.0.1:${HECATE_HEALTH_PORT}/health" || exit 1
 
-CMD ["/app/bin/hecate_tom_harbour", "foreground"]
+CMD ["/app/bin/hecate_tom_world", "foreground"]

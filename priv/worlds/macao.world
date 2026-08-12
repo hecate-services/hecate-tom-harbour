@@ -1,0 +1,601 @@
+%% -*- mode: erlang -*-
+%%
+%% Traders of Macao. The world.
+%%
+%% Read with file:consult/1, loaded and checked by tom_world.
+%%
+%% This file is data, all of it. tom_shared defines the map a good is, the map a
+%% harbour is and the map a recipe is, and checks that the entries below fill
+%% them in. There is no vocabulary here the engine holds a closed list of. Every
+%% name below can be edited without touching a line of Erlang.
+%%
+%% EVERY HARBOUR HAS A MARKET, and every good can be bought and sold in it at
+%% the going price. So there is no list of what a harbour stocks. The only thing
+%% that differs is what is PLENTIFUL there, which is what "produces" means: what
+%% the hinterland makes and what the harbour's position concentrates. Plentiful
+%% is cheap. Everything else is dear until somebody sails it in.
+%%
+%% A good says nothing about where it comes from. That is not an omission: where
+%% a good comes from is the regions of the harbours that produce it, and saying
+%% it twice is how the two got to disagree. Silver claimed the Americas long
+%% after Acapulco started digging ore instead.
+%%
+%% An id is a permanent commitment. Rename one and every stored fact that ever
+%% named it is orphaned.
+
+{world, #{id => macao, name => <<"Traders of Macao">>}}.
+
+%% Regions ---------------------------------------------------------------
+
+{region, #{id => china,          name => <<"China">>}}.
+{region, #{id => japan,          name => <<"Japan">>}}.
+{region, #{id => southeast_asia, name => <<"Southeast Asia">>}}.
+{region, #{id => south_asia,     name => <<"South Asia">>}}.
+{region, #{id => west_asia,      name => <<"West Asia">>}}.
+{region, #{id => east_africa,    name => <<"East Africa">>}}.
+{region, #{id => europe,         name => <<"Europe">>}}.
+{region, #{id => north_america,  name => <<"North America">>}}.
+{region, #{id => south_america,  name => <<"South America">>}}.
+
+%% Goods -----------------------------------------------------------------
+
+{good, #{id => raw_silk, name => <<"Raw silk">>,
+         character => <<"The flagship. Dear, moderate bulk.">>}}.
+{good, #{id => silk_piece_goods, name => <<"Silk piece goods">>,
+         character => <<"Damask, satin, taffeta. Finished, dearer, "
+                        "same stowage.">>}}.
+{good, #{id => porcelain, name => <<"Porcelain">>,
+         character => <<"Cheap by the ton, very bulky, breaks in a storm.">>}}.
+{good, #{id => tea, name => <<"Tea">>,
+         character => <<"Bulky, loses value with every week aboard.">>}}.
+{good, #{id => gold, name => <<"Gold">>,
+         character => <<"Trades at a different rate in India. "
+                        "Pure arbitrage.">>}}.
+{good, #{id => musk, name => <<"Musk">>,
+         character => <<"A pouch is a cargo.">>}}.
+{good, #{id => rhubarb, name => <<"Rhubarb">>,
+         character => <<"Medicinal, light, keeps indefinitely.">>}}.
+{good, #{id => camphor, name => <<"Camphor">>,
+         character => <<"Wastes if badly stowed.">>}}.
+{good, #{id => sugar, name => <<"Sugar">>,
+         character => <<"Bulk, cheap, ruined by wet.">>}}.
+{good, #{id => tutenag, name => <<"Tutenag">>,
+         character => <<"Zinc. Heavy, dull. Ballast that pays a little.">>}}.
+{good, #{id => quicksilver, name => <<"Quicksilver">>,
+         character => <<"Small casks, dear, refines silver.">>}}.
+
+{good, #{id => silver, name => <<"Silver">>,
+         character => <<"The money good. No bulk, immense value.">>}}.
+{good, #{id => copper, name => <<"Copper">>,
+         character => <<"Heavy, steady, unglamorous.">>}}.
+{good, #{id => lacquerware, name => <<"Lacquerware">>,
+         character => <<"Novelty. Fragile, dear, demand fades.">>}}.
+
+{good, #{id => sandalwood, name => <<"Sandalwood">>,
+         character => <<"Timor and nowhere else. The one route with no "
+                        "substitute.">>}}.
+{good, #{id => eaglewood, name => <<"Eaglewood">>,
+         character => <<"Calambac. The finest incense, absurd value by "
+                        "weight.">>}}.
+{good, #{id => cloves, name => <<"Cloves">>,
+         character => <<"Moluccas. Small, dear, hoarded.">>}}.
+{good, #{id => nutmeg, name => <<"Nutmeg">>,
+         character => <<"Banda. Small, dear, hoarded.">>}}.
+{good, #{id => mace, name => <<"Mace">>,
+         character => <<"The aril of the nutmeg. Rarer than the nut.">>}}.
+{good, #{id => pepper, name => <<"Pepper">>,
+         character => <<"Heavy, cheap, pays only at volume.">>}}.
+{good, #{id => tin, name => <<"Tin">>,
+         character => <<"Malaya. Heavy, honest, always a buyer.">>}}.
+{good, #{id => birds_nests, name => <<"Birds' nests">>,
+         character => <<"The islands' luxury. Tiny bulk, absurd price.">>}}.
+{good, #{id => shark_fin, name => <<"Shark fin">>,
+         character => <<"Same market as birds' nests, coarser.">>}}.
+{good, #{id => trepang, name => <<"Trepang">>,
+         character => <<"Sea cucumber. Bulky for a luxury, must be dried "
+                        "hard.">>}}.
+{good, #{id => tortoiseshell, name => <<"Tortoiseshell">>,
+         character => <<"Light, dear, worked into combs and boxes.">>}}.
+{good, #{id => benzoin, name => <<"Benzoin">>,
+         character => <<"Gum benjamin. Incense and medicine.">>}}.
+{good, #{id => deer_hides, name => <<"Deer hides">>,
+         character => <<"Siam and Formosa. Rots if the hold is wet.">>}}.
+{good, #{id => beeswax, name => <<"Beeswax">>,
+         character => <<"Candles for churches and temples. Dull and "
+                        "steady.">>}}.
+{good, #{id => rice, name => <<"Rice">>,
+         character => <<"The bulk staple, and the thing crews eat.">>}}.
+{good, #{id => ambergris, name => <<"Ambergris">>,
+         character => <<"Found, not produced. A windfall, never a plan.">>}}.
+
+{good, #{id => cotton_piece_goods, name => <<"Cotton piece goods">>,
+         character => <<"The floor. Always a buyer, thin margin.">>}}.
+{good, #{id => opium, name => <<"Opium">>,
+         character => <<"Bengal and Malwa. Small, dear, bannable.">>}}.
+{good, #{id => saltpetre, name => <<"Saltpetre">>,
+         character => <<"Munitions, so its legality follows the politics.">>}}.
+{good, #{id => indigo, name => <<"Indigo">>,
+         character => <<"The great dye. Bulky for its price, keeps "
+                        "forever.">>}}.
+{good, #{id => cinnamon, name => <<"Cinnamon">>,
+         character => <<"Ceylon. Light, fragrant, jealously controlled.">>}}.
+{good, #{id => ivory, name => <<"Ivory">>,
+         character => <<"Heavy tusks, carved in Canton, sold on.">>}}.
+{good, #{id => pearls, name => <<"Pearls">>,
+         character => <<"No bulk at all.">>}}.
+{good, #{id => horses, name => <<"Horses">>,
+         character => <<"Persia and Arabia. Livestock. Eats, drinks, dies.">>}}.
+{good, #{id => cowries, name => <<"Cowries">>,
+         character => <<"Maldives. Money by the ton. Bulk currency.">>}}.
+
+{good, #{id => lead, name => <<"Lead">>,
+         character => <<"Heavy, cheap, shot and sheathing.">>}}.
+{good, #{id => coral, name => <<"Coral">>,
+         character => <<"Mediterranean. Light, dear, a genuine India "
+                        "favourite.">>}}.
+{good, #{id => broadcloth, name => <<"Broadcloth">>,
+         character => <<"English and Flemish woollens. The trap good. "
+                        "Nobody wants it.">>}}.
+{good, #{id => wine, name => <<"Wine">>,
+         character => <<"Portuguese, for Portuguese. Spoils, and the crew "
+                        "knows where it is.">>}}.
+{good, #{id => tobacco, name => <<"Tobacco">>,
+         character => <<"New and fashionable. Demand rising, not yet "
+                        "established.">>}}.
+{good, #{id => glassware_and_clocks, name => <<"Glassware and clocks">>,
+         character => <<"The curiosity trade. Fragile, and novelty wears "
+                        "off.">>}}.
+
+%% Raw materials. Nobody would carry these across an ocean for their own sake.
+%% They exist because a factory needs feeding, and because geography still binds
+%% the inputs even when the knowledge to use them has travelled.
+
+{good, #{id => raw_cotton, name => <<"Raw cotton">>,
+         character => <<"The bale before the loom. Bulky, cheap, and worth "
+                        "nothing far from a weaver.">>}}.
+{good, #{id => wool, name => <<"Wool">>,
+         character => <<"Greasy fleece. Nobody ships it far, and that is "
+                        "rather the point.">>}}.
+{good, #{id => hemp, name => <<"Hemp">>,
+         character => <<"Rope and sailcloth begin here.">>}}.
+{good, #{id => iron, name => <<"Iron">>,
+         character => <<"Bar iron. Heavy, dull, and everything needs it.">>}}.
+{good, #{id => kaolin, name => <<"Kaolin">>,
+         character => <<"The white clay. Worthless anywhere there is no "
+                        "kiln.">>}}.
+{good, #{id => sulphur, name => <<"Sulphur">>,
+         character => <<"Yellow, stinking, and half of gunpowder.">>}}.
+
+%% Woods. Five kinds, because they are not one thing and never were.
+
+{good, #{id => teak, name => <<"Teak">>,
+         character => <<"The best hull timber in the world. The worm will "
+                        "not touch it.">>}}.
+{good, #{id => oak, name => <<"Oak">>,
+         character => <<"European hulls, and heavy going.">>}}.
+{good, #{id => pine, name => <<"Pine">>,
+         character => <<"Masts, spars and deals. Long, straight and awkward "
+                        "to stow.">>}}.
+{good, #{id => ebony, name => <<"Ebony">>,
+         character => <<"Black hardwood for cabinets. Dense, dear and "
+                        "slow-growing.">>}}.
+{good, #{id => brazilwood, name => <<"Brazilwood">>,
+         character => <<"The red dyewood that named a country.">>}}.
+
+{good, #{id => silver_ore, name => <<"Silver ore">>,
+         character => <<"Potosi and Zacatecas. Mountains of it, and worth "
+                        "nothing until quicksilver arrives from China.">>}}.
+
+{good, #{id => gold_ore, name => <<"Gold ore">>,
+         character => <<"Reef gold, crushed out of rock. The dust in the "
+                        "river is free; this is not.">>}}.
+
+%% Manufactured. These come out of factories and nowhere else.
+
+{good, #{id => chintz, name => <<"Chintz">>,
+         character => <<"Painted and printed cloth. What plain cotton is "
+                        "worth once somebody has taken trouble over it.">>}}.
+{good, #{id => cordage, name => <<"Cordage">>,
+         character => <<"Rope by the coil. Every ship eats it.">>}}.
+{good, #{id => sailcloth, name => <<"Sailcloth">>,
+         character => <<"Canvas in bolts. Bulky, and a ship dare not run "
+                        "out.">>}}.
+{good, #{id => gunpowder, name => <<"Gunpowder">>,
+         character => <<"Kegs. Banned in half the ports it is wanted in, "
+                        "and it does not like damp.">>}}.
+{good, #{id => cannon, name => <<"Cannon">>,
+         character => <<"Bronze guns. Enormously heavy, enormously dear, "
+                        "and they change what a harbour dares refuse.">>}}.
+{good, #{id => ironwork, name => <<"Ironwork">>,
+         character => <<"Nails, fittings, tools. Dull, and nothing gets "
+                        "built without it.">>}}.
+{good, #{id => candles, name => <<"Candles">>,
+         character => <<"For churches and for temples, which is two "
+                        "markets and one product.">>}}.
+{good, #{id => incense, name => <<"Incense">>,
+         character => <<"Blended sticks. Worth far more than the wood that "
+                        "went in.">>}}.
+{good, #{id => arrack, name => <<"Arrack">>,
+         character => <<"Distilled from rice. The crew will find it.">>}}.
+
+%% Harbours --------------------------------------------------------------
+%%
+%% produces = what is PLENTIFUL here, and therefore cheap. Everything else is
+%% still traded, at whatever the market says. An empty list is legitimate: a
+%% pure entrepot makes nothing of its own and is rich anyway.
+
+{harbour, #{id => macao, name => <<"Macao">>, region => china,
+            character => <<"The Pearl River mouth. Everything Chinese "
+                           "leaves through here.">>,
+            produces => [raw_silk, silk_piece_goods, porcelain, tea, gold,
+                         musk, rhubarb, sugar, tutenag, quicksilver,
+                         kaolin]}}.
+
+{harbour, #{id => nagasaki, name => <<"Nagasaki">>, region => japan,
+            character => <<"Silk in, silver out. The shortest rich water "
+                           "in the world.">>,
+            produces => [silver, copper, lacquerware, sulphur]}}.
+{harbour, #{id => hirado, name => <<"Hirado">>, region => japan,
+            character => <<"The older Japanese door, and a quieter one.">>,
+            produces => [silver, copper, sulphur]}}.
+
+{harbour, #{id => hoi_an, name => <<"Hoi An">>, region => southeast_asia,
+            character => <<"Cochinchina. Silk and the finest incense.">>,
+            produces => [raw_silk, eaglewood, benzoin]}}.
+{harbour, #{id => ayutthaya, name => <<"Ayutthaya">>,
+            region => southeast_asia,
+            character => <<"Siam, up the river. Hides and rice.">>,
+            produces => [deer_hides, rice, benzoin, tin, teak]}}.
+{harbour, #{id => malacca, name => <<"Malacca">>, region => southeast_asia,
+            character => <<"The strait. Nearly everything passes, and pays "
+                           "to pass.">>,
+            produces => [pepper, tin, cloves, nutmeg, mace, sandalwood,
+                         eaglewood, benzoin, trepang, tortoiseshell, beeswax,
+                         rice, ambergris, shark_fin, birds_nests, camphor]}}.
+{harbour, #{id => bantam, name => <<"Bantam">>, region => southeast_asia,
+            character => <<"Java's pepper port, crowded with rivals, and "
+                           "the Sumatran gold comes down to it.">>,
+            produces => [pepper, rice, gold_ore]}}.
+{harbour, #{id => batavia, name => <<"Batavia">>, region => southeast_asia,
+            character => <<"The Dutch seat. Orderly, well armed, and no "
+                           "friend.">>,
+            produces => [pepper, cloves, nutmeg, mace, sugar]}}.
+{harbour, #{id => macassar, name => <<"Macassar">>,
+            region => southeast_asia,
+            character => <<"The free port. Whatever is banned elsewhere is "
+                           "sold here.">>,
+            produces => [trepang, cloves, nutmeg, tortoiseshell,
+                         sandalwood]}}.
+{harbour, #{id => ternate, name => <<"Ternate">>, region => southeast_asia,
+            character => <<"Cloves and nothing else, and it needs "
+                           "feeding.">>,
+            produces => [cloves]}}.
+{harbour, #{id => banda, name => <<"Banda">>, region => southeast_asia,
+            character => <<"The only nutmeg in the world, on a few small "
+                           "islands.">>,
+            produces => [nutmeg, mace]}}.
+{harbour, #{id => lifau, name => <<"Lifau">>, region => southeast_asia,
+            character => <<"Timor. Sandalwood, and a long way from "
+                           "anywhere.">>,
+            produces => [sandalwood, beeswax]}}.
+{harbour, #{id => manila, name => <<"Manila">>, region => southeast_asia,
+            character => <<"Makes nothing, and is rich anyway. Chinese "
+                           "goods meet New World silver here.">>,
+            produces => []}}.
+{harbour, #{id => jolo, name => <<"Jolo">>, region => southeast_asia,
+            character => <<"Sulu. Pearls, and a reputation.">>,
+            produces => [pearls, birds_nests, trepang]}}.
+
+{harbour, #{id => goa, name => <<"Goa">>, region => south_asia,
+            character => <<"The seat of the Estado. Every Indian good "
+                           "reaches it.">>,
+            produces => [cotton_piece_goods, opium, saltpetre, indigo,
+                         cinnamon, ivory, pearls, cowries, pepper]}}.
+{harbour, #{id => cochin, name => <<"Cochin">>, region => south_asia,
+            character => <<"Malabar pepper, and the older Portuguese "
+                           "footing.">>,
+            produces => [pepper, cinnamon, ivory, teak]}}.
+{harbour, #{id => surat, name => <<"Surat">>, region => south_asia,
+            character => <<"Gujarat. The cloth that clothes the trade.">>,
+            produces => [cotton_piece_goods, indigo, opium, saltpetre,
+                         raw_cotton, hemp, iron]}}.
+{harbour, #{id => nagapattinam, name => <<"Nagapattinam">>,
+            region => south_asia,
+            character => <<"Coromandel. Painted cloth the islands crave.">>,
+            produces => [cotton_piece_goods, indigo, raw_cotton]}}.
+{harbour, #{id => colombo, name => <<"Colombo">>, region => south_asia,
+            character => <<"Ceylon. Cinnamon, guarded jealously.">>,
+            produces => [cinnamon, pearls, ebony]}}.
+
+{harbour, #{id => hormuz, name => <<"Hormuz">>, region => west_asia,
+            character => <<"The gulf's gate. Horses and pearls, and heat.">>,
+            produces => [horses, pearls]}}.
+
+{harbour, #{id => mozambique, name => <<"Mozambique">>,
+            region => east_africa,
+            character => <<"The Cape route's halfway house. Ivory, fever, "
+                           "and the reefs of Monomotapa behind it.">>,
+            produces => [ivory, gold, ebony, gold_ore]}}.
+
+{harbour, #{id => lisbon, name => <<"Lisbon">>, region => europe,
+            character => <<"Where the carreira ends and the money is.">>,
+            produces => [lead, coral, broadcloth, wine,
+                         glassware_and_clocks, wool, oak, iron]}}.
+{harbour, #{id => seville, name => <<"Seville">>, region => europe,
+            character => <<"Spain's one legal door to the Americas. The "
+                           "silver only rests here.">>,
+            produces => [wine, broadcloth, wool, oak]}}.
+{harbour, #{id => antwerp, name => <<"Antwerp">>, region => europe,
+            character => <<"The northern counting house. Spices go up the "
+                           "Scheldt.">>,
+            produces => [broadcloth, glassware_and_clocks, lead, wool, hemp,
+                         oak]}}.
+{harbour, #{id => amsterdam, name => <<"Amsterdam">>, region => europe,
+            character => <<"The rival, and it pays better than it "
+                           "should.">>,
+            produces => [broadcloth, lead, glassware_and_clocks, wool, hemp,
+                         oak, pine, iron]}}.
+
+{harbour, #{id => acapulco, name => <<"Acapulco">>, region => north_america,
+            character => <<"One route in, one route out, and a fortune on "
+                           "it. The ore is here; the quicksilver is not.">>,
+            produces => [silver_ore]}}.
+{harbour, #{id => havana, name => <<"Havana">>, region => north_america,
+            character => <<"Where the treasure fleets gather before the "
+                           "crossing.">>,
+            produces => [tobacco, sugar]}}.
+
+{harbour, #{id => bahia, name => <<"Bahia">>, region => south_america,
+            character => <<"Brazil. Sugar, and the long empty Atlantic.">>,
+            produces => [sugar, tobacco, brazilwood]}}.
+{harbour, #{id => callao, name => <<"Callao">>, region => south_america,
+            character => <<"Lima's port. The mountain of Potosi behind it, "
+                           "and a taste for silk it is not supposed to "
+                           "have.">>,
+            produces => [silver_ore]}}.
+
+%% Recipes ---------------------------------------------------------------
+%%
+%% A factory is built from a recipe, and the recipe copy is destroyed in the
+%% building. The town owns the factory. What the Harbour Master gets back is the
+%% tax on the traffic it draws, which is why he pays for it.
+%%
+%% A recipe is three physical facts: what goes in, what comes out, and how long
+%% a batch takes. Nothing here is money. What a batch costs in wages and fuel is
+%% itself a price, and prices emerge from trade rather than being written down
+%% by anybody. A fixed money number on a recipe would be an island of central
+%% planning in a market game.
+%%
+%% Nor is a recipe ever retuned, reformulated or retired. You cannot un-invent a
+%% process. A better one is a NEW recipe, published alongside the old, and the
+%% old one keeps working for whoever holds a copy. Which gunpowder recipe you
+%% hold starts to matter, not merely whether you can make gunpowder.
+%%
+%% Two recipes making the same good by different means is therefore normal.
+%% Bronze cannon and iron cannon are one product out of different holds.
+%%
+%% A factory arbitrages against its own market, so its buying lifts the input
+%% price and its selling depresses the output price until it strangles itself.
+%% It only keeps earning if somebody ships the inputs in and the outputs out.
+%% That is the entire reason factories are in this game.
+
+{recipe, #{id => weave_silk, name => <<"Silk weaving">>,
+           character => <<"Raw silk on the loom. The oldest money in Asia.">>,
+           inputs => #{raw_silk => 2}, outputs => #{silk_piece_goods => 1},
+           ticks => 4}}.
+
+{recipe, #{id => weave_cotton, name => <<"Cotton weaving">>,
+           character => <<"Plain cloth by the bolt. Dull and endless.">>,
+           inputs => #{raw_cotton => 2}, outputs => #{cotton_piece_goods => 1},
+           ticks => 3}}.
+
+{recipe, #{id => full_broadcloth, name => <<"Fulling">>,
+           character => <<"Wool beaten into cloth nobody in the tropics "
+                          "wants.">>,
+           inputs => #{wool => 2}, outputs => #{broadcloth => 1},
+           ticks => 4}}.
+
+{recipe, #{id => print_chintz, name => <<"Chintz printing">>,
+           character => <<"Plain cotton and indigo become the cloth the "
+                          "islands crave.">>,
+           inputs => #{cotton_piece_goods => 2, indigo => 1},
+           outputs => #{chintz => 2},
+           ticks => 3}}.
+
+{recipe, #{id => dye_chintz_red, name => <<"Red chintz dyeing">>,
+           character => <<"The same cloth, the other colour, and a whole "
+                          "ocean between the two dyes.">>,
+           inputs => #{cotton_piece_goods => 2, brazilwood => 1},
+           outputs => #{chintz => 2},
+           ticks => 3}}.
+
+{recipe, #{id => throw_porcelain, name => <<"Porcelain kiln">>,
+           character => <<"White clay and a great deal of heat.">>,
+           inputs => #{kaolin => 2}, outputs => #{porcelain => 1},
+           ticks => 6}}.
+
+{recipe, #{id => spin_cordage, name => <<"Ropewalk">>,
+           character => <<"Hemp into rope. Every ship eats it.">>,
+           inputs => #{hemp => 2}, outputs => #{cordage => 1},
+           ticks => 2}}.
+
+{recipe, #{id => weave_sailcloth, name => <<"Sailcloth weaving">>,
+           character => <<"Canvas in bolts. A ship dare not run out.">>,
+           inputs => #{hemp => 2}, outputs => #{sailcloth => 1},
+           ticks => 3}}.
+
+{recipe, #{id => mill_gunpowder, name => <<"Powder mill">>,
+           character => <<"Saltpetre and sulphur, and a wide berth from "
+                          "everything else.">>,
+           inputs => #{saltpetre => 2, sulphur => 1},
+           outputs => #{gunpowder => 2},
+           ticks => 5}}.
+
+{recipe, #{id => cast_cannon, name => <<"Gun foundry">>,
+           character => <<"Copper and tin into bronze. It changes what a "
+                          "harbour dares refuse.">>,
+           inputs => #{copper => 3, tin => 1}, outputs => #{cannon => 1},
+           ticks => 8}}.
+
+{recipe, #{id => forge_ironwork, name => <<"Forge">>,
+           character => <<"Nails, fittings, tools. Nothing gets built "
+                          "without it.">>,
+           inputs => #{iron => 2}, outputs => #{ironwork => 1},
+           ticks => 3}}.
+
+{recipe, #{id => dip_candles, name => <<"Chandlery">>,
+           character => <<"Beeswax for churches and for temples, which is "
+                          "two markets and one product.">>,
+           inputs => #{beeswax => 1}, outputs => #{candles => 2},
+           ticks => 2}}.
+
+{recipe, #{id => blend_incense, name => <<"Incense blending">>,
+           character => <<"Sandalwood and benzoin, worth far more than the "
+                          "wood that went in.">>,
+           inputs => #{sandalwood => 1, benzoin => 1},
+           outputs => #{incense => 2},
+           ticks => 3}}.
+
+{recipe, #{id => distil_arrack, name => <<"Distillery">>,
+           character => <<"Rice into spirit. The crew will find it.">>,
+           inputs => #{rice => 3}, outputs => #{arrack => 1},
+           ticks => 4}}.
+
+{recipe, #{id => amalgamate_silver, name => <<"Silver refinery">>,
+           character => <<"Ore and quicksilver in the patio. China sends the "
+                          "mercury west, America sends the silver east, and "
+                          "the galleon is full in both directions.">>,
+           inputs => #{silver_ore => 4, quicksilver => 1},
+           outputs => #{silver => 1},
+           ticks => 6}}.
+
+{recipe, #{id => amalgamate_gold, name => <<"Gold refinery">>,
+           character => <<"The same patio, the other metal. Two refineries "
+                          "bidding for one flask of Chinese mercury is a "
+                          "quarrel with no polite end.">>,
+           inputs => #{gold_ore => 4, quicksilver => 1},
+           outputs => #{gold => 1},
+           ticks => 6}}.
+
+%% Waypoints ------------------------------------------------------------
+%%
+%% Places at sea. A waypoint has no market and no hinterland; it is somewhere a
+%% ship passes and can be said to be.
+%%
+%% A HARBOUR IS A WAYPOINT THAT HAPPENS TO HAVE A MARKET. Routes below name
+%% either kind, so a route that passes a port is a route a ship may put in at,
+%% and putting in costs time. That is the ship's decision to make, not the
+%% world's and not the sea's.
+
+{waypoint, #{id => formosa_strait, name => <<"Formosa Strait">>,
+             character => <<"Shallow, crowded, and blowing hard half the "
+                            "year.">>}}.
+{waypoint, #{id => the_paracels, name => <<"The Paracels">>,
+             character => <<"Reefs that have taken more ships than any "
+                            "storm in these waters.">>}}.
+{waypoint, #{id => luzon_strait, name => <<"Luzon Strait">>,
+             character => <<"The door between the China Sea and the "
+                            "Pacific.">>}}.
+{waypoint, #{id => palawan_passage, name => <<"Palawan Passage">>,
+             character => <<"Inside route to the south. Slow and reefy, and "
+                            "out of the worst weather.">>}}.
+{waypoint, #{id => the_kuroshio, name => <<"The Kuroshio">>,
+             character => <<"The black current, which carries a ship east "
+                            "whether she wants it or not.">>}}.
+{waypoint, #{id => the_open_pacific, name => <<"The Open Pacific">>,
+             character => <<"Weeks of nothing. The longest water any ship "
+                            "in this trade crosses.">>}}.
+{waypoint, #{id => andaman_sea, name => <<"Andaman Sea">>,
+             character => <<"Monsoon country. It decides when you sail, not "
+                            "you.">>}}.
+{waypoint, #{id => laccadive_sea, name => <<"Laccadive Sea">>,
+             character => <<"The last easy water before the Malabar "
+                            "coast.">>}}.
+{waypoint, #{id => mozambique_channel, name => <<"Mozambique Channel">>,
+             character => <<"Narrow, current-ridden, and the only sensible "
+                            "way round Africa.">>}}.
+{waypoint, #{id => cape_of_good_hope, name => <<"Cape of Good Hope">>,
+             character => <<"Named in hope by men who had rounded it once "
+                            "and lived.">>}}.
+{waypoint, #{id => st_helena, name => <<"St Helena">>,
+             character => <<"A rock with water on it, in the middle of an "
+                            "ocean with none.">>}}.
+{waypoint, #{id => the_doldrums, name => <<"The Doldrums">>,
+             character => <<"No wind at all, for as long as it likes.">>}}.
+{waypoint, #{id => the_canaries, name => <<"The Canaries">>,
+             character => <<"Where the trade wind picks a ship up and takes "
+                            "her west.">>}}.
+
+%% Routes ---------------------------------------------------------------
+%%
+%% A route is geography: which waters lie between two ports, in order. It says
+%% nothing about how long any of it takes, because that is weather, season and
+%% hull, and all three are the sea's business rather than the map's.
+%%
+%% Routes are DIRECTIONAL. The way home was not the way out: the monsoon and the
+%% trades saw to that, and a world that pretends otherwise has thrown away the
+%% most interesting constraint in the period.
+
+{route, #{id => macao_to_nagasaki, name => <<"The Great Ship to Nagasaki">>,
+          from => macao, to => nagasaki, via => [formosa_strait],
+          character => <<"Silk out, silver back. The shortest rich water in "
+                         "the world.">>}}.
+{route, #{id => nagasaki_to_macao, name => <<"Home from Nagasaki">>,
+          from => nagasaki, to => macao, via => [formosa_strait],
+          character => <<"The same strait, the other way, and the wind has "
+                         "an opinion about it.">>}}.
+
+{route, #{id => macao_to_manila, name => <<"Macao to Manila">>,
+          from => macao, to => manila, via => [luzon_strait],
+          character => <<"A week of open water to meet the galleon.">>}}.
+{route, #{id => manila_to_macao, name => <<"Manila to Macao">>,
+          from => manila, to => macao, via => [palawan_passage],
+          character => <<"Inside the reefs, because the strait will not have "
+                         "you westbound in season.">>}}.
+
+{route, #{id => manila_to_acapulco, name => <<"The Manila Galleon">>,
+          from => manila, to => acapulco,
+          via => [luzon_strait, the_kuroshio, the_open_pacific],
+          character => <<"North until the current takes you, then east for "
+                         "as long as it lasts.">>}}.
+{route, #{id => acapulco_to_manila, name => <<"The Galleon Home">>,
+          from => acapulco, to => manila, via => [the_open_pacific],
+          character => <<"Downwind and far quicker, which is why the "
+                         "quicksilver goes west and the silver east.">>}}.
+
+{route, #{id => macao_to_malacca, name => <<"Down to the Strait">>,
+          from => macao, to => malacca, via => [the_paracels],
+          character => <<"Past the reefs that have taken more ships than any "
+                         "storm.">>}}.
+{route, #{id => malacca_to_macao, name => <<"Up to the Pearl River">>,
+          from => malacca, to => macao, via => [the_paracels],
+          character => <<"The same reefs, and the same care.">>}}.
+
+{route, #{id => malacca_to_goa, name => <<"Across the Bay">>,
+          from => malacca, to => goa, via => [andaman_sea, laccadive_sea],
+          character => <<"Monsoon country. It decides when you sail.">>}}.
+{route, #{id => goa_to_malacca, name => <<"Back to the Strait">>,
+          from => goa, to => malacca, via => [laccadive_sea, andaman_sea],
+          character => <<"And it decides when you come home.">>}}.
+
+{route, #{id => goa_to_lisbon, name => <<"The Carreira Home">>,
+          from => goa, to => lisbon,
+          via => [laccadive_sea, mozambique_channel, cape_of_good_hope,
+                  st_helena, the_doldrums],
+          character => <<"Half a year, round the Cape, and a stop at a rock "
+                         "for water.">>}}.
+{route, #{id => lisbon_to_goa, name => <<"The Carreira Out">>,
+          from => lisbon, to => goa,
+          via => [the_canaries, the_doldrums, cape_of_good_hope,
+                  mozambique_channel],
+          character => <<"Out with the trades, down past the calms, and "
+                         "round.">>}}.
+
+{route, #{id => lisbon_to_bahia, name => <<"The Brazil Run">>,
+          from => lisbon, to => bahia, via => [the_canaries, the_doldrums],
+          character => <<"West with the trade wind, and pray the calms are "
+                         "short.">>}}.
+{route, #{id => bahia_to_lisbon, name => <<"Home from Brazil">>,
+          from => bahia, to => lisbon, via => [the_doldrums, the_canaries],
+          character => <<"Sugar and tobacco, and the same calms in the "
+                         "way.">>}}.

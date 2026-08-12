@@ -58,7 +58,7 @@ tick_ms() -> whole(configured("TOM_TICK_MS", tick_ms, ?TICK_MS)).
 %% @doc Where this port keeps what it must not forget.
 -spec data_dir() -> string().
 data_dir() ->
-    path(configured("TOM_DATA_DIR", data_dir, <<"/var/lib/hecate-tom-harbour">>)).
+    path(configured("TOM_DATA_DIR", data_dir, <<"/var/lib/hecate-tom-world">>)).
 
 %% @doc What this port declares about itself, ready for tom_market:open/1.
 -spec standing() -> {ok, tom_crossing:standing()} | {error, term()}.
@@ -113,7 +113,7 @@ named(Name) -> Name.
 %% without a rebuild, which is the whole reason this service takes its identity
 %% from outside itself.
 configured(Var, Key, Default) ->
-    chosen(os:getenv(Var), application:get_env(hecate_tom_harbour, Key),
+    chosen(os:getenv(Var), application:get_env(hecate_tom_world, Key),
            Default).
 
 chosen(false, {ok, Value}, _Default) -> Value;
@@ -130,7 +130,7 @@ path(Value) when is_binary(Value) -> binary_to_list(Value);
 path(Value) when is_list(Value) -> Value.
 
 shipped(Kind, Name, Suffix) ->
-    filename:join([code:priv_dir(hecate_tom_harbour), Kind,
+    filename:join([code:priv_dir(hecate_tom_world), Kind,
                    <<Name/binary, Suffix/binary>>]).
 
 read_one(Path) -> only(file:consult(path(Path)), Path).

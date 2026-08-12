@@ -24,7 +24,7 @@
 %% that die come back with an empty cursor and walk the sea's whole history of
 %% landings here again, which costs a walk and takes nothing twice.
 %% @end
--module(hecate_tom_harbour_sup).
+-module(hecate_tom_world_sup).
 
 -behaviour(supervisor).
 

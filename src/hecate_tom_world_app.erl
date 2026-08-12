@@ -8,12 +8,12 @@
 %% this port must not forget goes in its own disk_log, which is four record
 %% shapes and needs no cluster to hold them.
 %% @end
--module(hecate_tom_harbour_app).
+-module(hecate_tom_world_app).
 
 -behaviour(application).
 
 -export([start/2, stop/1]).
 
-start(_Type, _Args) -> hecate_om:boot(hecate_tom_harbour_service).
+start(_Type, _Args) -> hecate_om:boot(hecate_tom_world_service).
 
 stop(_State) -> ok.

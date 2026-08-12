@@ -1,9 +1,9 @@
-{application, hecate_tom_harbour, [
-    {description, "TOM, Traders of Macao: a port and its market"},
+{application, hecate_tom_world, [
+    {description, "TOM, Traders of Macao: the world, and one of its places"},
     {vsn, "0.2.0"},
-    {registered, [hecate_tom_harbour_sup, tom_port, tom_crier, tom_advertiser,
+    {registered, [hecate_tom_world_sup, tom_port, tom_crier, tom_advertiser,
                   tom_hand_over_ship_sup]},
-    {mod, {hecate_tom_harbour_app, []}},
+    {mod, {hecate_tom_world_app, []}},
     {applications, [
         kernel,
         stdlib,
@@ -19,6 +19,6 @@
     {modules, []},
     {licenses, ["Apache-2.0"]},
     {links, [
-        {"GitHub", "https://github.com/hecate-services/hecate-tom-harbour"}
+        {"GitHub", "https://github.com/hecate-services/hecate-tom-world"}
     ]}
 ]}.

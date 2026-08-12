@@ -17,6 +17,6 @@ cd "$here"
 rebar3 as test compile >/dev/null
 
 erl -noshell \
-    -pa "$here/_build/test/lib/hecate_tom_harbour/ebin" \
-    -pa "$here/_build/test/lib/hecate_tom_harbour/test" \
+    -pa "$here/_build/test/lib/hecate_tom_world/ebin" \
+    -pa "$here/_build/test/lib/hecate_tom_world/test" \
     -eval "tom_sim:main([\"$ticks\"]), halt(0)."

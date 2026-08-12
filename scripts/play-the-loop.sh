@@ -33,7 +33,7 @@ set -euo pipefail
 harbour_repo="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 services="$(cd -- "${harbour_repo}/.." && pwd)"
 ocean_repo="${TOM_OCEAN_REPO:-${services}/hecate-tom-ocean}"
-house_repo="${TOM_HOUSE_REPO:-${services}/hecate-tom-house}"
+house_repo="${TOM_HOUSE_REPO:-${services}/hecate-tom-player}"
 station_repo="${MACULA_STATION_REPO:-$(cd -- "${services}/.." && pwd)/macula-io/macula-station}"
 
 run="${TOM_LOOP_DIR:-${harbour_repo}/_loop}"
@@ -244,7 +244,7 @@ start_harbour() {
          ERLANG_COOKIE=tom_loop \
          RELX_CONFIG_PATH="$run/$name/sys.config" \
          RELX_OUT_FILE_PATH="$run/$name/out" \
-         spawn "$name" "${harbour_repo}/_build/default/rel/hecate_tom_harbour/bin/hecate_tom_harbour" foreground )
+         spawn "$name" "${harbour_repo}/_build/default/rel/hecate_tom_world/bin/hecate_tom_world" foreground )
 
     await "$name" "http://127.0.0.1:${health}/health" 60
 }
@@ -289,7 +289,7 @@ start_house() {
     { say "["
       mesh_block "$house_health"
       cat <<EOF
-    {hecate_tom_house, [
+    {hecate_tom_player, [
         {realm_name,         <<"${realm_name}">>},
         {player,             <<"${player}">>},
         {ship,               <<"${ship}">>},
@@ -311,7 +311,7 @@ EOF
       && TOM_COOKIE=tom_loop \
          RELX_CONFIG_PATH="$run/house/sys.config" \
          RELX_OUT_FILE_PATH="$run/house/out" \
-         spawn house "${house_repo}/_build/default/rel/hecate_tom_house/bin/hecate_tom_house" foreground )
+         spawn house "${house_repo}/_build/default/rel/hecate_tom_player/bin/hecate_tom_player" foreground )
 
     await house "http://127.0.0.1:${house_web}/view" 60
 }

@@ -28,7 +28,7 @@
 %% Reading the standing out of priv is the point: a test that invented its own
 %% would pass while the file an operator actually deploys was unreadable.
 standing() ->
-    {ok, Standing} = file:consult(filename:join([code:priv_dir(hecate_tom_harbour),
+    {ok, Standing} = file:consult(filename:join([code:priv_dir(hecate_tom_world),
                                                  "harbours", "macao.standing"])),
     hd(Standing).
 
@@ -65,7 +65,7 @@ order(Key, Good, Quantity) ->
 the_shipped_ports_open_and_reproduce_the_worked_example_test() ->
     {ok, Macao} = tom_market:open(standing()),
     {ok, [Lisbon0]} = file:consult(
-                        filename:join([code:priv_dir(hecate_tom_harbour),
+                        filename:join([code:priv_dir(hecate_tom_world),
                                        "harbours", "lisbon.standing"])),
     {ok, Lisbon} = tom_market:open(Lisbon0),
     ?assert(near(tom_market:natural_price(Macao, musk), 12.915496650148841)),
@@ -459,7 +459,7 @@ handover(Hull) ->
 
 lisbon() ->
     {ok, [Standing]} = file:consult(
-                         filename:join([code:priv_dir(hecate_tom_harbour),
+                         filename:join([code:priv_dir(hecate_tom_world),
                                         "harbours", "lisbon.standing"])),
     {ok, Market} = tom_market:open(Standing),
     {Goods, Names} = tom_standing:goods_index(?REALM, Standing),

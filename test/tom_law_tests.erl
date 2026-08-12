@@ -230,7 +230,7 @@ grown(Port, Good) ->
     tom_market:natural_price(Market, Good).
 
 source_dir() ->
-    filename:join(code:lib_dir(hecate_tom_harbour), "src").
+    filename:join(code:lib_dir(hecate_tom_world), "src").
 
 read(Path) ->
     {ok, Bin} = file:read_file(Path),

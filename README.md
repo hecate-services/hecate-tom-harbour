@@ -1,10 +1,23 @@
-# hecate-tom-harbour
+# hecate-tom-world
 
-**TOM, Traders of Macao.** One port, the market behind it, and the service that
-runs it.
+**TOM, Traders of Macao.** The world: what exists, and one of the places in it.
 
 *This exists so that a trader can buy goods in one port, fill a ship, and sell
 them in another.*
+
+**One binary, run once per place.** An instance is a harbour, which is a place
+that has a market; a fort and a trading post are the same service with a
+garrison and no market, and are the second game. Eight or more instances run two
+apiece on `beam00` to `beam03`, each dialling a different station, owned by
+nobody and always on. **This is never one process**, which is the mistake the
+ocean died of.
+
+It carries `priv/worlds/macao.world` in its own release, so what a good is and
+where the ports are needs no service to answer and no event stream to catch up
+on. A player learns the world by fetching that artifact and checking its digest
+against `tom_world:digest/1`. What a **player** links is `macula` and nothing of
+ours, and that boundary is the one that matters: see
+[DESIGN_TWO_SERVICES.md](../hecate-tom-general/design/DESIGN_TWO_SERVICES.md).
 
 Two halves, and they are kept apart on purpose. The **mechanism** is pure
 functions: a market is a term, you pass one in and get one back, and nothing in
@@ -152,11 +165,27 @@ not a wobble in a heap.
 | `tom_quay` | One good's stack: its heap, its posted price, its trades, its tick |
 | `tom_crossing` | Where the two curves meet. The long-run structure of one good here |
 
+### What exists, which is data
+
+| In `know_the_world/` | Is |
+|--------|-----|
+| `tom_world` | Loads a world and checks it. Reports every problem, not the first. `digest/1` is what two peers compare |
+| `tom_goods` | The map a good is, and the questions you can ask about one |
+| `tom_harbours` | The map a harbour is |
+| `tom_places` | Waypoints and routes. The world says WHERE, and never how long |
+| `tom_recipes` | What a factory eats, what it makes, and how long a batch takes |
+| `tom_mri` | What any of them is called on the mesh, and how to resolve one back without minting an atom |
+
+Nothing in the market calls these, and that is not an accident waiting to be
+tidied up. A port's standing is still handed to `tom_market:open/1` as plain
+data, so the mechanism stays testable without a world and a world stays
+replaceable without a market.
+
 ### The service, which is not
 
 | Module | Is |
 |--------|-----|
-| `hecate_tom_harbour_app` / `_sup` / `_service` | OTP entry, the tree, and the hecate_om contract |
+| `hecate_tom_world_app` / `_sup` / `_service` | OTP entry, the tree, and the hecate_om contract |
 | `open_the_port/tom_port` | **The one process.** Market, clock, hulls, receipts, disk |
 | `open_the_port/tom_ledger` | What this port must not forget, on a disk, before it answers |
 | `tom_standing` | Which port this instance IS, read from the environment |
@@ -397,7 +426,7 @@ ocean and the house. They find each other over the mesh and nothing else — no
 Erlang distribution between the services, no shared disk, no shared library.
 Everything it writes lives under `_loop/`.
 
-It expects `hecate-tom-ocean`, `hecate-tom-house` and `macula-io/macula-station`
+It expects `hecate-tom-ocean`, `hecate-tom-player` and `macula-io/macula-station`
 checked out beside this repository; override with `TOM_OCEAN_REPO`,
 `TOM_HOUSE_REPO` and `MACULA_STATION_REPO`.
 
@@ -425,7 +454,7 @@ Nothing in the image says Macao, which is what lets one release run two ports.
 | `TOM_OCEAN` | `mri:instance:{realm}/tom/ocean` | the ocean. There is one, so the default is derivable |
 | `TOM_STANDING` | `priv/harbours/{harbour}.standing` | what this port declares about itself |
 | `TOM_SHIPS` | none | genesis hulls. **Exactly one port may be given these** |
-| `TOM_DATA_DIR` | `/var/lib/hecate-tom-harbour` | where the record lives. Must outlive the container |
+| `TOM_DATA_DIR` | `/var/lib/hecate-tom-world` | where the record lives. Must outlive the container |
 | `TOM_TICK_MS` | `10000` | how long a tick of the market lasts in wall time |
 | `MACULA_STATION_SEEDS` | none | the station to dial. Without it the port runs dark |
 | `HECATE_REALM` | none | the 32-byte realm TAG, as 64 hex characters, for macula |

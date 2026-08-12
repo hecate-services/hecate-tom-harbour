@@ -9,18 +9,18 @@
 %% only "buy_cargo" would tell a looker-up that either would do. The harbour is
 %% in the name because the harbour is the point.
 %% @end
--module(hecate_tom_harbour_service).
+-module(hecate_tom_world_service).
 
 -behaviour(hecate_om_service).
 
 -export([info/0, start/1, stop/1, health/0, capabilities/0, identity_spec/0]).
 
 info() ->
-    #{name => <<"hecate-tom-harbour">>,
+    #{name => <<"hecate-tom-world">>,
       version => <<"0.2.0">>,
-      description => <<"TOM, Traders of Macao: one port and its market">>}.
+      description => <<"TOM, Traders of Macao: one place in the world, and its market">>}.
 
-start(_Opts) -> hecate_tom_harbour_sup:start_link().
+start(_Opts) -> hecate_tom_world_sup:start_link().
 
 stop(_State) -> ok.
 
@@ -51,7 +51,7 @@ capabilities() ->
 %% listed for the same reason: this port DIALS the sea, and the sea never dials
 %% back.
 identity_spec() ->
-    #{scope => <<"hecate-tom-harbour">>,
+    #{scope => <<"hecate-tom-world">>,
       actions => [<<"publish">>, <<"advertise">>, <<"call">>,
                   <<"subscribe">>],
       resources => [tom_standing:harbour(),

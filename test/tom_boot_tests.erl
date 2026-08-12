@@ -50,7 +50,7 @@ open_a_port() ->
                          integer_to_list(erlang:unique_integer([positive]))]),
     os:putenv("TOM_HARBOUR", "macao"),
     os:putenv("TOM_DATA_DIR", Dir),
-    os:putenv("TOM_SHIPS", filename:join([code:priv_dir(hecate_tom_harbour),
+    os:putenv("TOM_SHIPS", filename:join([code:priv_dir(hecate_tom_world),
                                           "ships", "macao.ships"])),
     %% hecate_om's health listener is switched off for the run. It binds a fixed
     %% port, so a box already running any other hecate service fails the boot
@@ -58,11 +58,11 @@ open_a_port() ->
     %% service's: there is nothing about this port it would prove.
     ok = application:load(hecate_om),
     ok = application:set_env(hecate_om, health_port, 0),
-    {ok, _Started} = application:ensure_all_started(hecate_tom_harbour),
+    {ok, _Started} = application:ensure_all_started(hecate_tom_world),
     Dir.
 
 close_the_port(Dir) ->
-    ok = application:stop(hecate_tom_harbour),
+    ok = application:stop(hecate_tom_world),
     os:unsetenv("TOM_HARBOUR"),
     os:unsetenv("TOM_DATA_DIR"),
     os:unsetenv("TOM_SHIPS"),
@@ -107,8 +107,8 @@ a_trade_lands_in_the_hold() ->
 survives_a_restart(Dir) ->
     Before = tom_market:stock(tom_port:market(), musk),
     {ok, First} = tom_port:buy(order(<<"boot-2">>, 3.0)),
-    ok = application:stop(hecate_tom_harbour),
-    {ok, _Again} = application:ensure_all_started(hecate_tom_harbour),
+    ok = application:stop(hecate_tom_world),
+    {ok, _Again} = application:ensure_all_started(hecate_tom_world),
     ?assertEqual(Dir, os:getenv("TOM_DATA_DIR")),
     {ok, Replayed} = tom_port:buy(order(<<"boot-2">>, 3.0)),
     ?assertEqual(First, Replayed),
@@ -127,8 +127,8 @@ a_promise_survives_a_restart(_Dir) ->
     ?assertEqual(1, maps:get(<<"hop">>, Sailed)),
     ?assertMatch({error, <<"ship_consigned">>},
                  tom_port:buy(order(<<"boot-3">>, 1.0))),
-    ok = application:stop(hecate_tom_harbour),
-    {ok, _Again} = application:ensure_all_started(hecate_tom_harbour),
+    ok = application:stop(hecate_tom_world),
+    {ok, _Again} = application:ensure_all_started(hecate_tom_world),
     {ok, Berth} = tom_port:berth(#{<<"ship">> => ?CLARA}),
     ?assertEqual(<<"consigned">>, maps:get(<<"state">>, Berth)),
     ?assertEqual(?LISBON, maps:get(<<"bound_for">>, Berth)),

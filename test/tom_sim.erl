@@ -12,8 +12,8 @@
 %%
 %% or, if you would rather see the machinery,
 %%
-%%   erl -noshell -pa _build/test/lib/hecate_tom_harbour/ebin \
-%%       -pa _build/test/lib/hecate_tom_harbour/test \
+%%   erl -noshell -pa _build/test/lib/hecate_tom_world/ebin \
+%%       -pa _build/test/lib/hecate_tom_world/test \
 %%       -eval 'tom_sim:demo(), halt(0).'
 %%
 %% From code, tom_sim:run/3 gives back the price series as data, which is what
