@@ -25,6 +25,7 @@
 
 -export([position/2,
          leagues/3,
+         route_leagues/2,
          waypoints/1,
          waypoint_ids/1,
          waypoint/2,
@@ -99,6 +100,22 @@ position(World, Id) ->
 leagues(World, From, To) ->
     apart(position(World, From), position(World, To)).
 
+%% @doc How far a route is, in leagues, over water.
+%%
+%% THE SUM OF ITS SEGMENTS AND NEVER THE STRAIGHT LINE. Goa to Lisbon in a
+%% straight line is 1,502 leagues across Arabia and the Sahara, and no ship has
+%% ever done it. The route says laccadive_sea, mozambique_channel,
+%% cape_of_good_hope, st_helena, the_doldrums, and the distance is what a hull
+%% actually sails: down the length of Africa and back up the Atlantic.
+%%
+%% THAT IS THE ENTIRE JOB OF `via'. It was written as "which waters lie between
+%% two ports, in order" and read as decoration. It is the difference between a
+%% game where the Cape matters and a game where the map is a tablecloth.
+-spec route_leagues(tom_world:world(), route_id()) ->
+          {ok, float()} | {error, term()}.
+route_leagues(World, Id) ->
+    summed(World, legs(World, Id), 0.0).
+
 %% @doc Every waypoint, ordered by identifier.
 -spec waypoints(tom_world:world()) -> [waypoint()].
 waypoints(World) ->
@@ -167,6 +184,17 @@ calls_at(World, Id, Place) ->
     lists:member(Place, maps:get(via, Route)).
 
 %% Internal
+
+%% A leg that names a place this world has never heard of stops the sum rather
+%% than being skipped: a route with a hole in it is a route nobody should be
+%% quoted a distance for.
+summed(_World, [], Leagues) ->
+    {ok, Leagues};
+summed(World, [{From, To} | Rest], Leagues) ->
+    added(World, Rest, Leagues, leagues(World, From, To)).
+
+added(World, Rest, Leagues, {ok, Leg})  -> summed(World, Rest, Leagues + Leg);
+added(_World, _Rest, _Leagues, Problem) -> Problem.
 
 sited({ok, Waypoint}, _Harbour)  -> {ok, maps:get(at, Waypoint)};
 sited({error, _}, {ok, Harbour}) -> {ok, maps:get(at, Harbour)};

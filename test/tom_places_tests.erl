@@ -61,6 +61,26 @@ the_galleon_crosses_the_antimeridian_test() ->
     {ok, Leagues} = tom_places:leagues(World, luzon_strait, the_open_pacific),
     ?assert(Leagues > 1000 andalso Leagues < 1300).
 
+%% THE CAPE IS THE WHOLE POINT OF `via'. Goa to Lisbon in a straight line is
+%% 1,502 leagues across Arabia and the Sahara and no ship has ever done it. The
+%% route goes down the length of Africa and back up the Atlantic, and is more
+%% than twice as far. A distance that ignored the waters would be a map with no
+%% Cape in it, which is a different game.
+a_route_is_measured_over_water_test() ->
+    World = world(),
+    {ok, Sailed} = tom_places:route_leagues(World, goa_to_lisbon),
+    {ok, Straight} = tom_places:leagues(World, goa, lisbon),
+    ?assert(Sailed > Straight * 2).
+
+%% Routes are directional, and so are their lengths. Manila to Macao goes inside
+%% the reefs because the strait will not have you westbound in season, and the
+%% inside passage is half as far again as the strait.
+the_way_home_is_not_the_way_out_test() ->
+    World = world(),
+    {ok, Out} = tom_places:route_leagues(World, macao_to_manila),
+    {ok, Home} = tom_places:route_leagues(World, manila_to_macao),
+    ?assert(Home > Out).
+
 %% A route names harbours and waters in one list, so both kinds answer the same
 %% question about where they are.
 either_kind_of_place_has_a_position_test() ->
