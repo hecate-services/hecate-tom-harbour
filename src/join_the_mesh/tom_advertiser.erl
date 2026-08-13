@@ -6,12 +6,15 @@
 %% Lisbon and the coin would be gone with no way to tell whose fault it was.
 %% derive_procedure/2 exists for exactly this and costs nothing at eight ports.
 %%
-%% SEVEN PROCEDURES, AND NOT ONE OF THEM IS AN ARRIVAL. A harbour is
-%% infrastructure and has no say in whether a ship turns up, so there is no door
-%% here for the sea to knock at: `receive_ship' is a desk this port enters by
-%% itself, off the sea's announcement and off its own catch-up ask, and it is not
-%% something a stranger can call. Everything below is a thing a HOUSE asks this
-%% port to do.
+%% EIGHT PROCEDURES, AND ONE OF THEM IS AN ARRIVAL. Seven are things a HOUSE
+%% asks this port to do. The eighth, `receive_ship', is a door for another PORT,
+%% and it exists because the sea dissolved: a hull crosses the wire once, from
+%% the port she sailed from to this one, and somebody has to be able to knock.
+%%
+%% A HARBOUR STILL HAS NO SAY IN WHETHER A SHIP TURNS UP. The desk is not a
+%% negotiation and it cannot refuse a well-formed hull: it is idempotent on the
+%% ship and the hop, it answers held to a repeat, and the only refusal is a
+%% payload that is not a hull. Advertising it opens a door, not a vote.
 %%
 %% IT DIALS OUT AND RETRIES. A hecate service opens no port and waits for
 %% nobody: it connects to a station over QUIC and advertises through that. Until
@@ -48,7 +51,8 @@ procedures() ->
      {<<"sell_cargo">>, {tom_sell_cargo, handle}},
      {<<"sail_ship">>, {tom_sail_ship, handle}},
      {<<"get_ship">>, {tom_get_ship, handle}},
-     {<<"commission_ship">>, {tom_commission_ship, handle}}].
+     {<<"commission_ship">>, {tom_commission_ship, handle}},
+     {<<"receive_ship">>, {tom_receive_ship, handle}}].
 
 init([]) ->
     self() ! advertise,

@@ -1,17 +1,22 @@
-%% @doc Promise a hull to the ocean, and freeze it until the ocean has it.
+%% @doc Send a hull to sea, and freeze her until the far port has her.
 %%
 %% A CONSIGNMENT IS NOT A HOP. Writing it down does not move custody. It does
 %% two things: it FREEZES the hull, so nothing can be bought into it, sold out
 %% of it or consigned a second time, and it OBLIGES this port to keep calling
-%% the ocean until it gets an answer. This port stays the custodian, at the old
-%% hop, for as long as that takes. If the ocean is down for an hour the hull sits
-%% here for an hour, visibly consigned, which is the truth and is better than
-%% pretending it left.
+%% the far port until it gets an answer. This port stays the custodian, at the
+%% old hop, for as long as that takes. If the far port is dark for an hour she
+%% lies in the roads for an hour, which is the truth and is better than
+%% pretending somebody else has her.
+%%
+%% SHE SAILS AT ONCE, because there is no longer a sea to be picked up by.
+%% Consignment and departure were two moments while an ocean had to come and
+%% take her; they are one now, and the fact this port publishes is that she
+%% sailed.
 %%
 %% NO IDEMPOTENCY KEY, BECAUSE THE HULL'S OWN STATE IS THE KEY. Called again
 %% with the same destination while consigned, it answers the same thing. Called
 %% with a different destination, already_bound: the promise has been made and
-%% the payload the ocean is being retried with cannot change underneath it, or
+%% the payload the far port is being retried with cannot change underneath it, or
 %% the retry would stop being byte for byte the same call and the receiver could
 %% no longer tell a repeat from a new handover.
 %%
@@ -35,7 +40,7 @@ at(State, Payload, Now) ->
             maps:get(tom_wire:text(<<"ship">>, Payload),
                      maps:get(ships, State), undefined)).
 
-%% @doc The payload the ocean is being asked to take, rebuilt from a berth.
+%% @doc The payload the far port is being asked to take, rebuilt from a berth.
 %%
 %% USED AT BOOT TO PICK UP AN UNFINISHED PROMISE, and it must reconstruct the
 %% call BYTE FOR BYTE, because that identity is the whole of how the receiver
@@ -75,7 +80,7 @@ addressed(State, Now, Berth, Destination, true) ->
     consigned(State, Now, Berth, Destination).
 
 %% The same order twice is the same answer, from the berth rather than from a
-%% stored receipt: a frozen hull already carries the hop the ocean will hold and
+%% stored receipt: a frozen hull already carries the hop the far port will hold and
 %% the instant it was promised.
 again(State, _Now, Berth, Destination, true) ->
     {{ok, #{<<"ship">> => tom_ship:id(maps:get(ship, Berth)),
@@ -87,26 +92,45 @@ again(State, _Now, Berth, Destination, true) ->
 again(State, _Now, _Berth, _Destination, false) ->
     {{error, <<"already_bound">>}, State, []}.
 
+%% SHE IS CONSIGNED TO THE FAR PORT AND NOT TO THE SEA, which is the whole of
+%% what changed when the ocean dissolved. There is no third party to hand her to
+%% and no second hop: she leaves here and arrives there, one crossing of the wire
+%% for one leg, and `hop' is the leg rather than a count of custodians.
+%%
+%% HER FATE IS DRAWN NOW, in the same outcome that writes the berth, and it is
+%% written down with it. Drawing it when she is due would let a crash between
+%% the draw and the disk re-roll her on the next boot. See tom_passage.
 consigned(State, #{at := At}, Berth, Destination) ->
     Hull = maps:get(ship, Berth),
     Ship = tom_ship:id(Hull),
-    Ocean = maps:get(ocean, State),
     Hop = tom_ship:hop(Hull) + 1,
+    Due = At + tom_passage:passage_ms(),
+    Fate = tom_passage:fate(#{ship => Ship,
+                              owner => tom_ship:owner(Hull),
+                              from => maps:get(harbour, State),
+                              bound_for => Destination,
+                              sailed_at => At}),
     Frozen = Berth#{state := consigned, bound_for := Destination, hop := Hop,
-                    since := At, consigned_to => Ocean},
+                    since := At, consigned_to => Destination,
+                    due_at => Due, fate => Fate},
     {{ok, #{<<"ship">> => Ship,
             <<"hop">> => Hop,
             <<"bound_for">> => Destination,
-            <<"consigned_to">> => Ocean,
+            <<"consigned_to">> => Destination,
+            <<"due_at">> => Due,
             <<"at">> => At}},
      State#{ships := maps:put(Ship, Frozen, maps:get(ships, State))},
-     [{record, {consigned_ship, Ship, Hop, Ocean, Destination, At}},
-      {cry, tom_wire:fact(maps:get(realm, State), <<"custody">>,
-                          <<"ship_consigned">>),
+     [{record, {consigned_ship, Ship, Hop, Destination, At, Due, Fate}},
+      %% THE FATE IS NOT IN THE FACT. Everything needed to check it afterwards is
+      %% (ship, owner, from, bound_for, at), and anybody who wants to do the
+      %% arithmetic early can, but this port does not hand them the answer.
+      {cry, tom_wire:fact(maps:get(realm, State), <<"voyage">>,
+                          <<"ship_sailed">>),
        #{<<"harbour">> => maps:get(harbour, State),
          <<"ship">> => Ship,
+         <<"owner">> => tom_ship:owner(Hull),
          <<"hop">> => Hop,
-         <<"to">> => Ocean,
          <<"bound_for">> => Destination,
+         <<"due_at">> => Due,
          <<"at">> => At}},
-      {hand_over, Ship, Hop, Ocean, handover(State, Frozen)}]}.
+      {put_to_sea, Ship, Hop, Due, Fate, handover(State, Frozen)}]}.

@@ -8,32 +8,36 @@
 
 -include_lib("eunit/include/eunit.hrl").
 
-%% A HARBOUR IS INFRASTRUCTURE AND HAS NO SAY IN WHETHER A SHIP TURNS UP. It
-%% does not accept her, it receives her, and she is this port's from the moment
-%% the sea says so. So there is no door to knock at any more: `receive_ship' is
-%% a desk this port enters by itself, off the sea's announcement and off its own
-%% catch-up ask, and it is not a procedure a stranger can call.
+%% THE KNOCK IS BACK, AND IT IS NOT A REGRESSION. This test asserted the
+%% opposite for one day. It was right then: the sea announced a landfall and
+%% this port went and asked for it, so a door would have been a third way in.
 %%
-%% The two halves of the deletion are asserted together on purpose. Leaving the
-%% handler exported while dropping the advertisement would leave a live entry
-%% point nothing calls and nothing tests, which is exactly the shape of code
-%% that comes back.
-a_port_no_longer_answers_a_knock_test() ->
+%% DECISIONS.md called this on 2026-08-11, before the ocean was dissolved: "The
+%% knocking comes back with it, and that is not a regression. It was ugly as a
+%% worker pool the sea ran per undelivered landfall, and ugly again as an outbox
+%% with a cursor and a taken flag, because in both shapes a delivery obligation
+%% was a side table on a central actor. As the ship's own behaviour there is no
+%% side table, because there is nothing beside her."
+%%
+%% A HARBOUR STILL HAS NO SAY IN WHETHER A SHIP TURNS UP. The desk cannot refuse
+%% a well-formed hull, answers held to a repeat, and is idempotent on the ship
+%% and the hop. What is advertised is a door, not a vote.
+a_port_answers_a_knock_from_another_port_test() ->
     Named = [Name || {Name, _Handler} <- tom_advertiser:procedures()],
-    ?assertNot(lists:member(<<"receive_ship">>, Named)),
-    ?assertNot(lists:member({handle, 1},
-                            tom_receive_ship:module_info(exports))).
+    ?assert(lists:member(<<"receive_ship">>, Named)),
+    ?assert(lists:member({handle, 1},
+                         tom_receive_ship:module_info(exports))).
 
-%% SEVEN, AND EVERY ONE OF THEM ANSWERED BY A DESK IN THIS REPOSITORY. The
+%% EIGHT, AND EVERY ONE OF THEM ANSWERED BY A DESK IN THIS REPOSITORY. The
 %% capability list the service announces is built from this one, so a procedure
 %% that appears here without a desk is a promise made to the mesh that nothing
 %% keeps.
 a_procedure_has_a_desk_behind_it_test() ->
     Procedures = tom_advertiser:procedures(),
-    ?assertEqual(7, length(Procedures)),
+    ?assertEqual(8, length(Procedures)),
     ?assertEqual([<<"buy_cargo">>, <<"commission_ship">>, <<"get_ship">>,
-                  <<"list_quotes">>, <<"quote_purchase">>, <<"sail_ship">>,
-                  <<"sell_cargo">>],
+                  <<"list_quotes">>, <<"quote_purchase">>, <<"receive_ship">>,
+                  <<"sail_ship">>, <<"sell_cargo">>],
                  lists:sort([Name || {Name, _H} <- Procedures])),
     [?assert(lists:member({Function, 1}, Module:module_info(exports)))
      || {_Name, {Module, Function}} <- Procedures].

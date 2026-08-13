@@ -47,25 +47,24 @@ capabilities() ->
 %% THAT ONE SUBSCRIPTION IS NOT A CHANNEL FOR ANYTHING TO ARRIVE ON. A harbour
 %% has no say in whether a ship turns up, so nobody hands it one; the
 %% announcement is a nudge that makes this port ask the sea what it has landed
-%% here, and the ask is the only way a hull gets in. The sea's procedure is
-%% listed for the same reason: this port DIALS the sea, and the sea never dials
-%% back.
+%% here, and a hull gets in by presenting herself. There is no sea to dial: a
+%% port publishes that a ship sailed and that a ship was lost, and says nothing
+%% about anybody else's.
 identity_spec() ->
     #{scope => <<"hecate-tom-world">>,
       actions => [<<"publish">>, <<"advertise">>, <<"call">>,
                   <<"subscribe">>],
       resources => [tom_standing:harbour(),
-                    tom_standing:ocean(),
                     tom_wire:fact(tom_standing:realm(), <<"trade">>,
                                   <<"cargo_loaded">>),
                     tom_wire:fact(tom_standing:realm(), <<"trade">>,
                                   <<"cargo_discharged">>),
                     tom_wire:fact(tom_standing:realm(), <<"custody">>,
                                   <<"ship_moored">>),
-                    tom_wire:fact(tom_standing:realm(), <<"custody">>,
-                                  <<"ship_consigned">>),
-                    tom_wire:fact(tom_standing:realm(), <<"ocean">>,
-                                  <<"voyage">>, <<"landfall_made">>)],
+                    tom_wire:fact(tom_standing:realm(), <<"voyage">>,
+                                  <<"ship_sailed">>),
+                    tom_wire:fact(tom_standing:realm(), <<"voyage">>,
+                                  <<"ship_lost">>)],
       ttl_days => 30}.
 
 %% Internal

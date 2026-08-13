@@ -1,15 +1,15 @@
 %% @doc Where a hull is, as far as this port knows.
 %%
-%% THIS IS HOW A HOUSE THAT WAS SWITCHED OFF FINDS ITS SHIP. It asks the ocean
-%% what became of the voyage, and if the answer is that landfall was made and
-%% the destination has confirmed custody, it asks the destination this. Two
-%% reads, each to the service that owns the answer, and no subscription it
-%% needed to have been holding.
+%% THIS IS HOW A PLAYER WHO WAS SWITCHED OFF FINDS THEIR SHIP, and since the
+%% ocean dissolved it is the ONLY question they have to ask. A hull at sea is
+%% still this port's: custody does not move until the far port says held, so the
+%% port she sailed from answers for her the whole way across and says where she
+%% is bound and when she is due.
 %%
 %% not_here IS AN ANSWER AND NOT AN ERROR. A port that never had the hull and a
 %% port that had it last week say the same thing, which is true: neither of them
-%% has it. The house learns where it went from the ocean, which keeps its voyage
-%% records forever.
+%% has it. Ask the ports a player trades with and the one holding her answers;
+%% when two answer, the higher hop wins.
 %%
 %% ANYONE MAY ASK. There is no ownership check, deliberately, and it is a
 %% decision rather than an omission: what is tied up at a quay is visible from
@@ -41,10 +41,17 @@ asked(State, Ship) ->
 
 found(Ship, undefined) ->
     {ok, #{<<"state">> => <<"not_here">>, <<"ship">> => Ship}};
+%% AT SEA, AND THIS PORT SAYS SO. She is under way, this port is still her
+%% custodian, and it knows when she is due because it wrote that down when she
+%% sailed. An INSTANT and never a duration: how long a crossing takes is the
+%% sea's constant and subtracting two of this port's timestamps to recover it is
+%% the leak that putting `due_at' on the wire exists to prevent.
 found(_Ship, #{state := consigned} = Berth) ->
-    {ok, #{<<"state">> => <<"consigned">>,
+    {ok, #{<<"state">> => <<"in_passage">>,
            <<"ship">> => maps:get(ship, Berth),
            <<"bound_for">> => maps:get(bound_for, Berth),
+           <<"due_at">> => maps:get(due_at, Berth),
+           <<"sailed_at">> => maps:get(since, Berth),
            <<"since">> => maps:get(since, Berth)}};
 found(_Ship, #{state := moored} = Berth) ->
     {ok, #{<<"state">> => <<"moored">>,

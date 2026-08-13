@@ -43,6 +43,7 @@
          berth/1,
          commission/1,
          handed/2,
+         foundered/3,
          harbour/0,
          market/0]).
 
@@ -53,7 +54,6 @@
 
 %% @doc Everything this port is.
 -type state() :: #{harbour := binary(),
-                   ocean := binary(),
                    realm := binary(),
                    market := tom_market:market(),
                    goods := #{binary() => tom_crossing:good_id()},
@@ -80,15 +80,22 @@
                     hop := integer(),
                     since := integer()}.
 
-%% @doc A hull this port has promised away and frozen. Custody has NOT moved:
-%% this port is still the custodian, at the hop the hull is still standing at,
-%% and it owes the receiver a call until it gets an answer.
+%% @doc A hull this port has sent to sea and frozen. Custody has NOT moved: this
+%% port is still the custodian, at the hop the hull is standing at, and it owes
+%% the far port a call until it gets an answer.
+%%
+%% SHE CARRIES HER OWN CLOCK AND HER OWN FATE, both fixed at the instant she
+%% sailed and both on the disk before anybody was told. That is what makes a
+%% passage survive a reboot without being re-rolled, and it is why this port can
+%% answer where she is and when she is due without asking anybody.
 -type consigned() :: #{ship := tom_ship:ship(),
                        state := consigned,
                        bound_for := binary(),
                        hop := integer(),
                        since := integer(),
-                       consigned_to := binary()}.
+                       consigned_to := binary(),
+                       due_at := integer(),
+                       fate := tom_passage:fate()}.
 
 %% @doc When a desk is being asked. The tick is this port's private clock and
 %% never leaves; the instant is what goes on the wire.
@@ -98,6 +105,8 @@
 %% then acted on, in that order and never another.
 -type effect() :: {record, tom_ledger:entry()}
                 | {cry, binary(), map()}
+                | {put_to_sea, binary(), integer(), integer(),
+                   tom_passage:fate(), map()}
                 | {hand_over, binary(), integer(), binary(), map()}.
 
 %% @doc What every desk answers: the reply, the port afterwards, and the effects.
@@ -133,12 +142,12 @@ buy(Payload) -> ask({buy_cargo, Payload}).
 -spec sell(map()) -> {ok, map()} | {error, binary()}.
 sell(Payload) -> ask({sell_cargo, Payload}).
 
-%% @doc Promise a hull to the ocean and freeze it.
+%% @doc Send a hull to sea and freeze her until the far port has her.
 -spec sail(map()) -> {ok, map()} | {error, binary()}.
 sail(Payload) -> ask({sail_ship, Payload}).
 
-%% @doc Take custody of a hull the sea has landed here. Offered by
-%% tom_take_landings and by nothing else: no stranger calls this.
+%% @doc Take custody of a hull that has come off the sea. Offered by the promise
+%% the far port is keeping, and by nothing else: no stranger calls this.
 -spec take(map()) -> {ok, map()} | {error, binary()}.
 take(Payload) -> ask({receive_ship, Payload}).
 
@@ -153,6 +162,11 @@ commission(Payload) -> ask({commission_ship, Payload}).
 %% @doc The receiver said held. Let the hull go.
 -spec handed(binary(), integer()) -> ok.
 handed(Ship, Hop) -> gen_server:cast(?MODULE, {handed, Ship, Hop}).
+
+%% @doc She did not arrive. Told by her own passage, once, when her leg ran out.
+-spec foundered(binary(), integer(), tom_passage:cause()) -> ok.
+foundered(Ship, Hop, Cause) ->
+    gen_server:cast(?MODULE, {foundered, Ship, Hop, Cause}).
 
 %% @doc This port's own name, for whoever needs to say it.
 -spec harbour() -> binary().
@@ -172,7 +186,6 @@ init([]) ->
     {ok, Log} = tom_ledger:open(tom_standing:data_dir(), Harbour),
     {Goods, Names} = tom_standing:goods_index(Realm, Standing),
     Fresh = #{harbour => Harbour,
-              ocean => tom_standing:ocean(),
               realm => Realm,
               market => Market,
               goods => Goods,
@@ -199,6 +212,12 @@ handle_call(_Other, _From, State) ->
 %% its own terminal record and forgets. Both halves are here, in that order.
 handle_cast({handed, Ship, Hop}, State) ->
     {noreply, released(State, Ship, Hop, maps:get(ships, State))};
+%% SHE IS THE ONLY ONE WHO CAN SAY THIS, and she says it once. The fate was
+%% drawn and written down when she sailed, so this cast carries no decision: it
+%% is a passage reporting that its own leg ran out and what was already on the
+%% disk came true.
+handle_cast({foundered, Ship, Hop, Cause}, State) ->
+    {noreply, sank(State, Ship, Hop, Cause, maps:get(ships, State))};
 handle_cast(_Other, State) ->
     {noreply, State}.
 
@@ -241,6 +260,9 @@ apply_effect({record, Entry}, State) ->
 apply_effect({cry, Topic, Payload}, State) ->
     ok = tom_crier:cry(Topic, Payload),
     State;
+apply_effect({put_to_sea, Ship, Hop, Due, Fate, Payload}, State) ->
+    _ = tom_keep_the_sea_sup:put_to_sea(Ship, Hop, Due, Fate, Payload),
+    State;
 apply_effect({hand_over, Ship, Hop, To, Payload}, State) ->
     _ = tom_hand_over_ship_sup:start_handing(Ship, Hop, To, Payload),
     State.
@@ -268,8 +290,10 @@ settled(#{market := Market} = State, #{tick := Tick}) ->
 %% taken, given away and taken back again ends where it ended.
 remembered({took_ship, Ship, Hop, Hull, _From, At}, State) ->
     moored(highest(State, Ship, Hop), Ship, Hull, Hop, At);
-remembered({consigned_ship, Ship, Hop, To, BoundFor, At}, State) ->
-    frozen(State, Ship, Hop, To, BoundFor, At);
+remembered({consigned_ship, Ship, Hop, BoundFor, At, Due, Fate}, State) ->
+    frozen(State, Ship, Hop, BoundFor, At, Due, Fate);
+remembered({foundered_ship, Ship, _Hop, _Cause, _At}, State) ->
+    State#{ships := maps:remove(Ship, maps:get(ships, State))};
 remembered({handed_ship, Ship, _Hop, _To, _At}, State) ->
     State#{ships := maps:remove(Ship, maps:get(ships, State))};
 remembered({settled_order, Order, Good, Reply}, State) ->
@@ -283,13 +307,15 @@ moored(State, Ship, Hull, Hop, At) ->
                                      since => At},
                              maps:get(ships, State))}.
 
-frozen(State, Ship, Hop, To, BoundFor, At) ->
+frozen(State, Ship, Hop, BoundFor, At, Due, Fate) ->
     Berth = maps:get(Ship, maps:get(ships, State)),
     State#{ships := maps:put(Ship, Berth#{state := consigned,
                                           bound_for := BoundFor,
                                           hop := Hop,
                                           since := At,
-                                          consigned_to => To},
+                                          consigned_to => BoundFor,
+                                          due_at => Due,
+                                          fate => Fate},
                              maps:get(ships, State))}.
 
 %% RULE FOUR: the answer to a handover is permanent, so what is kept is the
@@ -365,10 +391,15 @@ launch(Hull, State) ->
 
 %% Letting go
 
+%% SHE GOES BACK TO SEA, NOT BACK TO THE DOOR. A hull found consigned on the
+%% ledger is put to sea again with whatever is left of her leg, and her passage
+%% works that out from the instant on the berth. If it ran out while this port
+%% was down she acts at once, which is right: the sea did not stop while the
+%% machine was off.
 resumed(State, Berth) ->
-    tom_hand_over_ship_sup:start_handing(
+    tom_keep_the_sea_sup:put_to_sea(
       tom_ship:id(maps:get(ship, Berth)), maps:get(hop, Berth),
-      maps:get(consigned_to, Berth),
+      maps:get(due_at, Berth), maps:get(fate, Berth),
       tom_sail_ship:handover(State, Berth)).
 
 released(State, Ship, Hop, Ships) ->
@@ -380,6 +411,27 @@ let_go(State, Ship, Hop, Berth) ->
     ok = tom_ledger:record(maps:get(log, State),
                            {handed_ship, Ship, Hop,
                             maps:get(consigned_to, Berth), tom_wire:now_ms()}),
+    State#{ships := maps:remove(Ship, maps:get(ships, State))}.
+
+%% Down with all hands, and with everything in her hold. The record goes down
+%% before the fact goes out, in the order every other effect here keeps.
+sank(State, Ship, Hop, Cause, Ships) ->
+    drowned(State, Ship, Hop, Cause, maps:get(Ship, Ships, undefined)).
+
+drowned(State, _Ship, _Hop, _Cause, undefined) ->
+    State;
+drowned(State, Ship, Hop, Cause, Berth) ->
+    At = tom_wire:now_ms(),
+    ok = tom_ledger:record(maps:get(log, State),
+                           {foundered_ship, Ship, Hop, Cause, At}),
+    ok = tom_crier:cry(tom_wire:fact(maps:get(realm, State), <<"voyage">>,
+                                     <<"ship_lost">>),
+                       #{<<"harbour">> => maps:get(harbour, State),
+                         <<"ship">> => Ship,
+                         <<"hop">> => Hop,
+                         <<"bound_for">> => maps:get(bound_for, Berth),
+                         <<"cause">> => atom_to_binary(Cause, utf8),
+                         <<"at">> => At}),
     State#{ships := maps:remove(Ship, maps:get(ships, State))}.
 
 %% THE ONE PLACE A PAYLOAD COMES IN FROM THE MESH. All eight desks are reached

@@ -33,14 +33,12 @@ boot_test_() ->
                fun() -> a_trade_lands_in_the_hold() end},
               {"and survives being switched off",
                fun() -> survives_a_restart(Dir) end},
-              {"a consignment resumes knocking after a restart",
+              {"a hull at sea goes back to sea after a restart",
                fun() -> a_promise_survives_a_restart(Dir) end},
               {"the mesh edge reads a payload shaped the way one arrives",
                fun() -> the_edge_reads_a_wire_payload() end},
               {"and hands a refusal back with its reason on it",
-               fun() -> the_edge_answers_with_a_reason() end},
-              {"the ears survive a boot with no sea to listen to",
-               fun() -> the_ears_survive_a_dark_mesh() end}]
+               fun() -> the_edge_answers_with_a_reason() end}]
      end}.
 
 %% Fixture
@@ -118,8 +116,8 @@ survives_a_restart(Dir) ->
     ?assertEqual(0, tom_ship:hop(Hull)),
     ?assert(near(tom_market:stock(tom_port:market(), musk), Before - 3.0)).
 
-%% A hull promised away and not yet taken is still frozen after a restart, still
-%% this port's custody at the old hop, and this port is knocking again. It never
+%% A hull at sea is still frozen after a restart, still this port's custody at
+%% the old hop, and back at sea with the leg she has left. It never
 %% un-consigns on its own initiative, because the receiver may already have it.
 a_promise_survives_a_restart(_Dir) ->
     {ok, Sailed} = tom_port:sail(#{<<"by">> => ?HOUSE, <<"ship">> => ?CLARA,
@@ -130,17 +128,18 @@ a_promise_survives_a_restart(_Dir) ->
     ok = application:stop(hecate_tom_world),
     {ok, _Again} = application:ensure_all_started(hecate_tom_world),
     {ok, Berth} = tom_port:berth(#{<<"ship">> => ?CLARA}),
-    ?assertEqual(<<"consigned">>, maps:get(<<"state">>, Berth)),
+    ?assertEqual(<<"in_passage">>, maps:get(<<"state">>, Berth)),
     ?assertEqual(?LISBON, maps:get(<<"bound_for">>, Berth)),
     %% Still at the OLD hop: a consignment is not a hop and custody has not
-    %% moved. The hull the ocean will be offered is one higher, and that map is
-    %% built fresh from this berth every time it is retried.
+    %% moved. The hull the far port will be offered is one higher, and that map
+    %% is built fresh from this berth every time it is retried.
     ?assertEqual(0, tom_ship:hop(maps:get(<<"ship">>, Berth))),
     ?assertMatch({error, <<"ship_consigned">>},
                  tom_port:buy(order(<<"boot-4">>, 1.0))),
-    %% And somebody is knocking on the ocean's door about it.
-    ?assertMatch([_Worker],
-                 supervisor:which_children(tom_hand_over_ship_sup)).
+    %% AND SHE IS BACK AT SEA. The berth carried her due instant and her fate
+    %% across the restart, so the passage resumed with what was left of her leg
+    %% and nothing was re-drawn.
+    ?assertMatch([_Hull], supervisor:which_children(tom_keep_the_sea_sup)).
 
 %% THE DESKS ARE ENTERED THROUGH `handle/1' AND NOTHING ELSE ENTERS THEM. Every
 %% other test in this file calls `tom_port' directly with the binary keys the
@@ -153,9 +152,9 @@ a_promise_survives_a_restart(_Dir) ->
 %% Both are chosen to move nothing: a read and a refusal. The ship is consigned
 %% by the time they run, and it stays that way.
 the_edge_reads_a_wire_payload() ->
-    ?assertMatch({ok, #{<<"state">> := <<"consigned">>}},
+    ?assertMatch({ok, #{<<"state">> := <<"in_passage">>}},
                  tom_get_ship:handle(#{{text, <<"ship">>} => ?CLARA})),
-    ?assertMatch({ok, #{<<"state">> := <<"consigned">>}},
+    ?assertMatch({ok, #{<<"state">> := <<"in_passage">>}},
                  tom_get_ship:handle(#{ship => ?CLARA})).
 
 %% A REFUSAL'S REASON HAS TO SURVIVE, and `{error, Binary}' does not carry one:
@@ -171,31 +170,6 @@ the_edge_answers_with_a_reason() ->
                      {text, <<"ship">>} => Stranger,
                      good => ?MUSK,
                      {text, <<"quantity">>} => 1.0})).
-
-%% THE CASE THE PURE TESTS CANNOT FAKE. tom_take_landings is the one process
-%% here that reaches for a subscription and for another service's procedure, and
-%% both are absent in this run: no seeds are configured, so hecate_om hands back
-%% no client. A port with no sea must still open, still trade and still answer,
-%% which is the same promise the crier and the advertiser already keep.
-%%
-%% BOTH TIMERS ARE DRIVEN BY HAND rather than waited on. `bind' and `look' are
-%% exactly the messages the five-second rebind and the thirty-second sweep
-%% deliver, so sending them exercises the identical clauses without putting half
-%% a minute of sleeping into every run. The synchronous call afterwards is the
-%% assertion: a gen_server answers it only after it has processed everything in
-%% front of it, so a process that died on either message cannot pass this.
-the_ears_survive_a_dark_mesh() ->
-    Ears = whereis(tom_take_landings),
-    ?assert(is_pid(Ears)),
-    Ears ! bind,
-    Ears ! look,
-    ?assertEqual({error, unknown_call},
-                 gen_server:call(tom_take_landings, ping, 10000)),
-    ?assertEqual(Ears, whereis(tom_take_landings)),
-    %% And nothing about a dark mesh has touched the port: the hull is where the
-    %% last case left it, still consigned, still this port's custody.
-    ?assertMatch({ok, #{<<"state">> := <<"consigned">>}},
-                 tom_port:berth(#{<<"ship">> => ?CLARA})).
 
 %% Helpers
 

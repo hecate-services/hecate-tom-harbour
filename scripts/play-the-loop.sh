@@ -7,9 +7,12 @@
 #   scripts/play-the-loop.sh status   who is up, and on which port
 #   scripts/play-the-loop.sh wipe     stop, then throw away every ledger
 #
-# Five processes: a macula-station for them to dial out to, two harbours, one
-# ocean, one house. They find each other over the MESH and nothing else: no
-# Erlang distribution between the services, no shared disk, no shared library.
+# Four processes: a macula-station for them to dial out to, two places and one
+# player. They find each other over the MESH and nothing else: no Erlang
+# distribution between the services, no shared disk, no shared library.
+#
+# THERE IS NO OCEAN. A ship is a process at the port she sailed from, waiting out
+# her leg, and when her hour comes she knocks on the far port's door herself.
 #
 # WHAT THE STATION IS FOR. A hecate service opens no inbound port. It dials out
 # to a station over QUIC and the station does the routing, so "two harbours can
@@ -32,7 +35,6 @@ set -euo pipefail
 
 harbour_repo="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 services="$(cd -- "${harbour_repo}/.." && pwd)"
-ocean_repo="${TOM_OCEAN_REPO:-${services}/hecate-tom-ocean}"
 house_repo="${TOM_HOUSE_REPO:-${services}/hecate-tom-player}"
 station_repo="${MACULA_STATION_REPO:-$(cd -- "${services}/.." && pwd)/macula-io/macula-station}"
 
@@ -59,7 +61,6 @@ station_port=4433
 station_admin=8443
 macao_health=8471
 lisbon_health=8472
-ocean_health=8473
 house_health=8460
 house_web=8461
 
@@ -249,32 +250,6 @@ start_harbour() {
     await "$name" "http://127.0.0.1:${health}/health" 60
 }
 
-# ── The ocean ─────────────────────────────────────────────────────────────────
-
-start_ocean() {
-    step "ocean"
-    if running ocean; then say "  already up"; return 0; fi
-
-    mkdir -p "$run/ocean/out" "$run/ocean/data"
-    { say "["
-      say "    {hecate_tom_ocean, [{ocean_mri, <<\"mri:instance:${realm_name}/tom/ocean\">>}]},"
-      mesh_block "$ocean_health"
-      say '    {kernel, [{logger_level, info}]}'
-      say "]." ; } >"$run/ocean/sys.config"
-
-    say "  health :${ocean_health}, data ${run}/ocean/data"
-    ( cd "$ocean_repo" \
-      && HECATE_DATA_DIR="$run/ocean/data" \
-         HECATE_NODE_NAME=tom_ocean \
-         HECATE_NODE_HOST=127.0.0.1 \
-         HECATE_COOKIE=tom_loop \
-         RELX_CONFIG_PATH="$run/ocean/sys.config" \
-         RELX_OUT_FILE_PATH="$run/ocean/out" \
-         spawn ocean "${ocean_repo}/_build/default/rel/hecate_tom_ocean/bin/hecate_tom_ocean" foreground )
-
-    await ocean "http://127.0.0.1:${ocean_health}/health" 60
-}
-
 # ── The house ─────────────────────────────────────────────────────────────────
 #
 # The player. It advertises nothing and nobody ever calls it, which is why it is
@@ -321,7 +296,7 @@ EOF
 build() {
     step "building"
     local repo name
-    for repo in "$harbour_repo" "$ocean_repo" "$house_repo"; do
+    for repo in "$harbour_repo" "$house_repo"; do
         name="$(basename "$repo")"
         [ -d "$repo" ] || { warn "no checkout at ${repo}"; return 1; }
         say "  ${name}"
@@ -345,7 +320,6 @@ start() {
     start_station
     start_harbour macao  "$macao_health"  macao
     start_harbour lisbon "$lisbon_health" ""
-    start_ocean
     start_house
 
     step "the game is open"
@@ -360,7 +334,6 @@ start() {
 
     macao   http://127.0.0.1:${macao_health}/health
     lisbon  http://127.0.0.1:${lisbon_health}/health
-    ocean   http://127.0.0.1:${ocean_health}/health
     station http://127.0.0.1:${station_admin}/status
 
     logs    ${run}/*.log
@@ -372,7 +345,7 @@ EOF
 stop() {
     step "stopping"
     local name
-    for name in house ocean lisbon macao station; do
+    for name in house lisbon macao station; do
         running "$name" && { say "  ${name}"; reap "$name"; } || rm -f "$(pidfile "$name")"
     done
 }
@@ -380,7 +353,7 @@ stop() {
 status() {
     local name
     printf '%-10s %-8s %s\n' SERVICE STATE WHERE
-    for name in station macao lisbon ocean house; do
+    for name in station macao lisbon house; do
         printf '%-10s %-8s %s\n' "$name" \
             "$(running "$name" && echo up || echo down)" \
             "$(logfile "$name")"

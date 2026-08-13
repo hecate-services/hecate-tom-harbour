@@ -47,9 +47,15 @@
 
 %% @doc Everything this port writes down. Business verbs in the past tense: what
 %% happened, not what was changed.
+%%
+%% A CONSIGNMENT CARRIES HER CLOCK AND HER FATE, because both are fixed when she
+%% sails and neither may be drawn again on the way back up. A port that re-rolled
+%% a fate at boot would sink a ship by being restarted.
 -type entry() :: {took_ship, binary(), integer(), tom_ship:ship(), binary(),
                   integer()}
-               | {consigned_ship, binary(), integer(), binary(), binary(),
+               | {consigned_ship, binary(), integer(), binary(), integer(),
+                  integer(), tom_passage:fate()}
+               | {foundered_ship, binary(), integer(), tom_passage:cause(),
                   integer()}
                | {handed_ship, binary(), integer(), binary(), integer()}
                | {settled_order, binary(), binary(), map()}.

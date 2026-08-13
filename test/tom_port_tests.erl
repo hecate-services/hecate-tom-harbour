@@ -248,17 +248,21 @@ buying_and_selling_the_same_lot_back_loses_only_the_fee_test() ->
 %% THE FREEZE IS THE WHOLE POINT OF A CONSIGNMENT. Custody has not moved and
 %% this port is still the custodian at the old hop, but nothing can be bought
 %% into the hull, sold out of it or promised to anybody else.
-sailing_freezes_the_ship_and_promises_it_to_the_ocean_test() ->
+sailing_freezes_the_ship_and_sends_her_to_sea_test() ->
     {{ok, Reply}, After, Effects} =
         tom_sail_ship:at(port(moored(clara())),
                          #{<<"by">> => ?HOUSE, <<"ship">> => ?CLARA,
                            <<"bound_for">> => ?LISBON}, now_at()),
     ?assertEqual(5, maps:get(<<"hop">>, Reply)),
-    ?assertEqual(?OCEAN, maps:get(<<"consigned_to">>, Reply)),
+    %% CONSIGNED TO THE FAR PORT AND NOT TO A SEA. One leg, one crossing of the
+    %% wire, and a hop that means the leg rather than a count of custodians.
+    ?assertEqual(?LISBON, maps:get(<<"consigned_to">>, Reply)),
     ?assertEqual(?LISBON, maps:get(<<"bound_for">>, Reply)),
-    ?assertMatch([{record, {consigned_ship, ?CLARA, 5, ?OCEAN, ?LISBON, _At}},
+    ?assert(maps:get(<<"due_at">>, Reply) > maps:get(<<"at">>, Reply)),
+    ?assertMatch([{record, {consigned_ship, ?CLARA, 5, ?LISBON, _At, _Due,
+                            _Fate}},
                   {cry, _Topic, _Fact},
-                  {hand_over, ?CLARA, 5, ?OCEAN, _Payload}], Effects),
+                  {put_to_sea, ?CLARA, 5, _Due2, _Fate2, _Payload}], Effects),
     [?assertMatch({{error, <<"ship_consigned">>}, _S, []}, Refused)
      || Refused <- [tom_buy_cargo:at(After, order(<<"a1">>, ?MUSK, 1.0),
                                      now_at()),
@@ -274,10 +278,10 @@ the_handover_payload_is_the_ship_as_it_will_be_test() ->
         tom_sail_ship:at(port(moored(clara())),
                          #{<<"by">> => ?HOUSE, <<"ship">> => ?CLARA,
                            <<"bound_for">> => ?LISBON}, now_at()),
-    [_Record, _Cry, {hand_over, _Ship, _Hop, _To, Payload}] = Effects,
+    [_Record, _Cry, {put_to_sea, _Ship, _Hop, _Due, _Fate, Payload}] = Effects,
     Hull = maps:get(<<"ship">>, Payload),
     ?assertEqual(5, tom_ship:hop(Hull)),
-    ?assertEqual(?OCEAN, tom_ship:custodian(Hull)),
+    ?assertEqual(?LISBON, tom_ship:custodian(Hull)),
     ?assertEqual(?LISBON, maps:get(<<"bound_for">>, Payload)),
     ?assertEqual(?MACAO, maps:get(<<"from">>, Payload)),
     ?assert(tom_ship:is_ship(Hull)).
@@ -285,11 +289,13 @@ the_handover_payload_is_the_ship_as_it_will_be_test() ->
 %% The hull's own state is the key, so the same order twice is the same answer
 %% and a different destination is refused rather than quietly re-promised.
 sailing_twice_is_idempotent_and_a_new_destination_is_refused_test() ->
-    {{ok, First}, Frozen, _E} =
+    {{ok, _First}, Frozen, _E} =
         tom_sail_ship:at(port(moored(clara())),
                          #{<<"by">> => ?HOUSE, <<"ship">> => ?CLARA,
                            <<"bound_for">> => ?LISBON}, now_at()),
-    ?assertMatch({{ok, First}, _S, []},
+    %% The repeat answers from the berth, which carries no due_at in its reply
+    %% because it is the same promise rather than a second departure.
+    ?assertMatch({{ok, #{<<"hop">> := 5}}, _S, []},
                  tom_sail_ship:at(Frozen,
                                   #{<<"by">> => ?HOUSE, <<"ship">> => ?CLARA,
                                     <<"bound_for">> => ?LISBON}, now_at())),
@@ -387,8 +393,11 @@ get_ship_says_which_of_three_things_is_true_test() ->
     ?assertEqual(<<"not_here">>, maps:get(<<"state">>, Nowhere)),
     ?assertEqual(<<"moored">>, maps:get(<<"state">>, Alongside)),
     ?assertEqual(clara(), maps:get(<<"ship">>, Alongside)),
-    ?assertEqual(<<"consigned">>, maps:get(<<"state">>, Promised)),
+    %% SHE IS AT SEA AND THIS PORT SAYS SO, with the instant she is due, which
+    %% is what lets a player who was switched off find her by asking one port.
+    ?assertEqual(<<"in_passage">>, maps:get(<<"state">>, Promised)),
     ?assertEqual(?LISBON, maps:get(<<"bound_for">>, Promised)),
+    ?assert(is_integer(maps:get(<<"due_at">>, Promised))),
     %% And a request with no hull named in it is a bug in the caller rather
     %% than a ship that has gone.
     ?assertMatch({{error, <<"bad_ship">>}, _D, []},
@@ -411,10 +420,13 @@ a_cargo_bought_here_sells_for_more_at_the_far_end_test() ->
     {{ok, _Sailed}, Frozen, Effects} =
         tom_sail_ship:at(Loaded, #{<<"by">> => ?HOUSE, <<"ship">> => ?CLARA,
                                    <<"bound_for">> => ?LISBON}, now_at()),
-    [_R, _C, {hand_over, _S, _H, _T, Payload}] = Effects,
+    %% SHE CROSSES THE WIRE ONCE, Macao to Lisbon. The payload her passage will
+    %% present is built at departure and is the same bytes every attempt, which
+    %% is the whole of how the far port dedupes.
+    [_R, _C, {put_to_sea, _S, _H, _Due, _Fate, Payload}] = Effects,
     {{ok, _Held}, Lisbon, _E2} = tom_receive_ship:at(lisbon(),
                                                      Payload#{<<"from">> =>
-                                                                  ?OCEAN},
+                                                                  ?MACAO},
                                                      now_at()),
     {{ok, Sold}, After, _E3} = tom_sell_cargo:at(Lisbon,
                                                  order(<<"b1">>, ?MUSK, 2.0),

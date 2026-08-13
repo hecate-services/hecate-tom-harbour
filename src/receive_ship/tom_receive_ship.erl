@@ -1,11 +1,15 @@
 %% @doc Take custody of a hull that has landed here.
 %%
-%% NOBODY CALLS THIS DESK. A harbour is infrastructure and has no say in whether
-%% a ship turns up: she is this port's from the instant the sea says so, whether
-%% or not this port has heard yet. So there is no procedure here for a stranger
-%% to dial and no negotiation to be had. The one way in is tom_take_landings,
-%% which hears the sea's announcement and asks the sea for what it has landed
-%% here, and both halves of that end at `at/3'.
+%% ONE PORT CALLS THIS DESK, AND NO STRANGER DOES. A hull crosses the wire once,
+%% from the port she sailed from to this one, so this is the door her passage
+%% knocks at when her leg runs out. It used to have no door at all: the sea
+%% announced a landfall and this port went and asked for it, which is two round
+%% trips and a cursor to do what one call does.
+%%
+%% A HARBOUR STILL HAS NO SAY IN WHETHER A SHIP TURNS UP. This is not a
+%% negotiation and there is nothing to refuse: she is this port's from the
+%% instant her passage says so, whether or not this port has heard yet. The desk
+%% opens a door, not a vote.
 %%
 %% TAKING IS THE COMMIT POINT AND IT IS DURABLE BEFORE THE REPLY. tom_port writes
 %% this desk's record to the disk and only then answers. Never the other way
@@ -25,7 +29,12 @@
 %% @end
 -module(tom_receive_ship).
 
--export([at/3]).
+-export([handle/1, at/3]).
+
+%% @doc The mesh handler. The one door here that another PORT knocks at, rather
+%% than a house.
+-spec handle(map()) -> {ok, map()}.
+handle(Payload) -> tom_wire:answer(tom_port:take(Payload)).
 
 %% @doc The desk.
 -spec at(tom_port:state(), map(), tom_port:now()) -> tom_port:outcome().

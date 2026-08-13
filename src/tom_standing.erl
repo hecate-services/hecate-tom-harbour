@@ -19,7 +19,6 @@
 
 -export([harbour/0,
          realm/0,
-         ocean/0,
          tick_ms/0,
          data_dir/0,
          standing/0,
@@ -45,11 +44,6 @@ harbour() -> tom_wire:instance(realm(), <<"harbour">>, port_name()).
 -spec realm() -> binary().
 realm() -> configured("TOM_REALM_NAME", realm_name, ?REALM).
 
-%% @doc The ocean. There is exactly one, so it has no name of its own and the
-%% default is derivable, but an operator can still point this port at another.
--spec ocean() -> binary().
-ocean() ->
-    configured("TOM_OCEAN", ocean, sea(realm())).
 
 %% @doc How long a tick lasts.
 -spec tick_ms() -> pos_integer().
@@ -91,9 +85,6 @@ goods_index(Realm, Standing) ->
 
 %% Internal
 
-sea(Realm) ->
-    {ok, MRI} = macula_mri:new(instance, Realm, [<<"tom">>, <<"ocean">>]),
-    MRI.
 
 class(Realm, Good) ->
     {ok, MRI} = macula_mri:new(class, Realm, [<<"tom">>, <<"good">>,
