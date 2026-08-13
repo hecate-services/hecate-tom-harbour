@@ -149,10 +149,16 @@ a_route_may_name_a_harbour_test() ->
     ?assert(tom_places:is_place(World, macao)),
     ?assertNot(tom_places:is_place(World, atlantis)).
 
+%% Every named place on a route is a leg boundary, so threading the posts of the
+%% trade through a route lengthens the list rather than changing its shape. The
+%% first leg leaves the port she sailed from and the last one arrives.
 legs_are_the_hops_a_ship_makes_test() ->
     World = world(),
     Legs = tom_places:legs(World, macao_to_nagasaki),
-    ?assertEqual([{macao, formosa_strait}, {formosa_strait, nagasaki}], Legs).
+    ?assertMatch([{macao, _} | _], Legs),
+    ?assertMatch({_, nagasaki}, lists:last(Legs)),
+    {ok, Route} = tom_places:route(World, macao_to_nagasaki),
+    ?assertEqual(length(maps:get(via, Route)) + 1, length(Legs)).
 
 no_route_is_an_answer_test() ->
     World = world(),
