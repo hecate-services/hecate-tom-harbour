@@ -37,23 +37,37 @@ at(State, Payload, _Now) ->
 asked(_State, undefined) ->
     {error, <<"bad_ship">>};
 asked(State, Ship) ->
-    found(Ship, maps:get(Ship, maps:get(ships, State), undefined)).
+    found(State, Ship, maps:get(Ship, maps:get(ships, State), undefined)).
 
-found(Ship, undefined) ->
+found(_State, Ship, undefined) ->
     {ok, #{<<"state">> => <<"not_here">>, <<"ship">> => Ship}};
 %% AT SEA, AND THIS PORT SAYS SO. She is under way, this port is still her
 %% custodian, and it knows when she is due because it wrote that down when she
 %% sailed. An INSTANT and never a duration: how long a crossing takes is the
 %% sea's constant and subtracting two of this port's timestamps to recover it is
 %% the leak that putting `due_at' on the wire exists to prevent.
-found(_Ship, #{state := consigned} = Berth) ->
+%% THE LINE COMES WITH HER, so a house that has been switched off for a week
+%% asks one question and can draw the voyage it missed. It is the port's to send:
+%% the route is the world's, this port carries the world, and a player links
+%% nothing of ours.
+found(State, _Ship, #{state := consigned} = Berth) ->
     {ok, #{<<"state">> => <<"in_passage">>,
            <<"ship">> => maps:get(ship, Berth),
            <<"bound_for">> => maps:get(bound_for, Berth),
            <<"due_at">> => maps:get(due_at, Berth),
            <<"sailed_at">> => maps:get(since, Berth),
+           <<"path">> => line(State, maps:get(bound_for, Berth)),
            <<"since">> => maps:get(since, Berth)}};
-found(_Ship, #{state := moored} = Berth) ->
+found(_State, _Ship, #{state := moored} = Berth) ->
     {ok, #{<<"state">> => <<"moored">>,
            <<"ship">> => maps:get(ship, Berth),
            <<"since">> => maps:get(since, Berth)}}.
+
+%% The line she is on, rebuilt from the map rather than kept on the berth: it is
+%% the same line every time and a copy per hull would be a copy to go stale.
+line(State, BoundFor) ->
+    drawn(tom_places:route_between(maps:get(world, State), maps:get(place, State),
+                                   tom_wire:local(BoundFor))).
+
+drawn({ok, Route})   -> tom_wire:path(Route);
+drawn({error, _Why}) -> [].

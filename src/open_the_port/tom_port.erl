@@ -55,6 +55,8 @@
 %% @doc Everything this port is.
 -type state() :: #{harbour := binary(),
                    realm := binary(),
+                   world := tom_world:world(),
+                   place := tom_places:place_id(),
                    market := tom_market:market(),
                    goods := #{binary() => tom_crossing:good_id()},
                    names := #{tom_crossing:good_id() => binary()},
@@ -182,11 +184,19 @@ init([]) ->
     Realm = tom_standing:realm(),
     Harbour = tom_standing:harbour(),
     {ok, Standing} = tom_standing:standing(),
+    {ok, World} = tom_world:load_default(),
     {ok, Market} = tom_market:open(Standing),
     {ok, Log} = tom_ledger:open(tom_standing:data_dir(), Harbour),
     {Goods, Names} = tom_standing:goods_index(Realm, Standing),
     Fresh = #{harbour => Harbour,
               realm => Realm,
+              %% THE SEA CONSULTS THE WORLD AND THE MARKET STILL DOES NOT. A
+              %% passage needs to know how far it is, which is the map's to say.
+              %% The market is unchanged and still opens from a standing handed
+              %% to it as plain data, so the mechanism stays testable without a
+              %% world in the room.
+              world => World,
+              place => tom_standing:place(),
               market => Market,
               goods => Goods,
               names => Names,

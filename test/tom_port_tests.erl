@@ -34,11 +34,18 @@ standing() ->
 
 port() -> port(#{}).
 
-port(Ships) ->
+port(Ships) -> port(Ships, macao).
+
+%% THE REAL WORLD, NOT A FIXTURE OF ONE. A passage asks the map how far it is
+%% and refuses a pair of ports with no line between them, so a made-up world
+%% here would be testing a map nobody sails. Macao to Lisbon is a real route of
+%% 4,586 leagues and that is what these tests cross.
+port(Ships, Place) ->
     Standing = standing(),
     {ok, Market} = tom_market:open(Standing),
+    {ok, World} = tom_world:load_default(),
     {Goods, Names} = tom_standing:goods_index(?REALM, Standing),
-    #{harbour => ?MACAO, ocean => ?OCEAN, realm => ?REALM,
+    #{harbour => ?MACAO, realm => ?REALM, world => World, place => Place,
       market => Market, goods => Goods, names => Names, tick_ms => 10000,
       ships => Ships, receipts => #{}, taken => #{}, log => no_disk_in_a_test}.
 
@@ -474,8 +481,9 @@ lisbon() ->
                          filename:join([code:priv_dir(hecate_tom_world),
                                         "harbours", "lisbon.standing"])),
     {ok, Market} = tom_market:open(Standing),
+    {ok, World} = tom_world:load_default(),
     {Goods, Names} = tom_standing:goods_index(?REALM, Standing),
-    #{harbour => ?LISBON, ocean => ?OCEAN, realm => ?REALM,
+    #{harbour => ?LISBON, realm => ?REALM, world => World, place => lisbon,
       market => Market, goods => Goods, names => Names, tick_ms => 10000,
       ships => #{}, receipts => #{}, taken => #{}, log => no_disk_in_a_test}.
 

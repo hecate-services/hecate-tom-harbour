@@ -15,8 +15,21 @@ departure() ->
       bound_for => ?LISBON,
       sailed_at => 1786528800000}.
 
-a_crossing_takes_ninety_seconds_test() ->
-    ?assertEqual(90000, tom_passage:passage_ms()).
+%% A CROSSING IS AS LONG AS THE WATER IS WIDE, which it was not until the map
+%% had distances on it: every voyage took ninety seconds, so Macao to Nagasaki
+%% and the Manila galleon were the same afternoon. The galleon is eight times the
+%% short hop and the clock now says so.
+a_crossing_is_as_long_as_the_water_is_wide_test() ->
+    Hop = tom_passage:passage_ms(335),
+    Galleon = tom_passage:passage_ms(2849),
+    ?assert(Galleon > Hop * 8),
+    ?assertEqual(60_000, tom_passage:passage_ms(tom_passage:leagues_per_minute())).
+
+%% Nothing is instant, whatever the arithmetic says. A leg of no length would
+%% otherwise arrive in the same instant it left, and a player would never see
+%% her go.
+even_the_shortest_water_takes_a_moment_test() ->
+    ?assert(tom_passage:passage_ms(0) >= 1000).
 
 the_hazard_is_a_share_of_ten_thousand_test() ->
     Hazard = tom_passage:hazard(),

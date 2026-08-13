@@ -18,6 +18,7 @@
 -module(tom_standing).
 
 -export([harbour/0,
+         place/0,
          realm/0,
          tick_ms/0,
          data_dir/0,
@@ -35,6 +36,17 @@
 %% half, so at ten seconds a crossing is nine ticks and a stripped quay visibly
 %% refills while a ship is at sea, which is the point of having a clock at all.
 -define(TICK_MS, 10000).
+
+%% @doc Which place on the map this instance is, as the world calls it.
+%%
+%% A PORT HAS TWO NAMES AND THEY ARE DIFFERENT THINGS. The MRI is an address on
+%% the mesh and this is a spot on the earth. Nothing is minted here: a name the
+%% world has never heard of is not a place, and it comes back `unknown', which
+%% fails the route lookup, which is what should happen.
+-spec place() -> atom().
+place() ->
+    try binary_to_existing_atom(port_name(), utf8)
+    catch error:badarg -> unknown end.
 
 %% @doc This instance's own name on the mesh.
 -spec harbour() -> binary().

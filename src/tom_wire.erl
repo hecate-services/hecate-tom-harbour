@@ -32,6 +32,8 @@
          list/2,
          instance/3,
          is_harbour/1,
+         local/1,
+         path/1,
          procedure/2,
          fact/3,
          fact/4]).
@@ -132,6 +134,28 @@ instance(Realm, Kind, Name) ->
     {ok, MRI} = macula_mri:new(instance, Realm, [?ORG, Kind, Name]),
     MRI.
 
+%% @doc The last segment of an MRI, as the atom the map calls that place by.
+%%
+%% A HARBOUR HAS TWO NAMES AND THEY ARE DIFFERENT THINGS. The MRI is an address
+%% on the mesh; the atom is a spot on the earth in the world file. This is the
+%% one place they are turned into each other, and it mints no atom: a place the
+%% world has never heard of is not a place, so a name with no atom already
+%% behind it comes back as `unknown' and the route lookup fails, which is what
+%% should happen.
+-spec local(binary()) -> atom().
+local(MRI) when is_binary(MRI) ->
+    named(lists:last(binary:split(MRI, <<"/">>, [global])));
+local(_Other) ->
+    unknown.
+
+%% @doc A route's line, as pairs on the wire.
+%%
+%% A LIST OF LISTS AND NOT A LIST OF TUPLES, because a tuple is not a thing CBOR
+%% carries and the far side is a browser in the end. Latitude first, the way the
+%% world file writes it and the way everybody says it out loud.
+-spec path(map()) -> [[number()]].
+path(Route) -> [[Lat, Lng] || {Lat, Lng} <- maps:get(path, Route, [])].
+
 %% @doc Whether an MRI names a harbour instance.
 %%
 %% A PARSE AND NOT A LOOKUP. This port has no directory and cannot know whether
@@ -141,6 +165,9 @@ instance(Realm, Kind, Name) ->
 -spec is_harbour(term()) -> boolean().
 is_harbour(MRI) when is_binary(MRI) -> harbour(macula_mri:parse(MRI));
 is_harbour(_Other) -> false.
+
+named(Short) ->
+    try binary_to_existing_atom(Short, utf8) catch error:badarg -> unknown end.
 
 %% @doc Where a call to a particular service goes.
 %%

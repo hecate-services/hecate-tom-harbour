@@ -77,7 +77,21 @@ addressed(State, Now, #{state := consigned} = Berth, Destination, true) ->
     again(State, Now, Berth, Destination,
           maps:get(bound_for, Berth) =:= Destination);
 addressed(State, Now, Berth, Destination, true) ->
-    consigned(State, Now, Berth, Destination).
+    charted(State, Now, Berth, Destination,
+            tom_places:route_between(maps:get(world, State),
+                                     maps:get(place, State),
+                                     tom_wire:local(Destination))).
+
+%% NO ROUTE IS A REFUSAL, AND IT IS A NEW ONE. Until the map had lines on it any
+%% destination shaped like a harbour was sailable and the crossing took the same
+%% ninety seconds whether the water existed or not. Now a voyage is a route, a
+%% route is a line over real water, and two ports with no line between them are
+%% two ports you cannot sail between. That is the map being load-bearing rather
+%% than decorative, and it is the point of having drawn it.
+charted(State, _Now, _Berth, _Destination, {error, _Why}) ->
+    {{error, <<"no_route">>}, State, []};
+charted(State, Now, Berth, Destination, {ok, Route}) ->
+    consigned(State, Now, Berth, Destination, Route).
 
 %% The same order twice is the same answer, from the berth rather than from a
 %% stored receipt: a frozen hull already carries the hop the far port will hold and
@@ -100,11 +114,13 @@ again(State, _Now, _Berth, _Destination, false) ->
 %% HER FATE IS DRAWN NOW, in the same outcome that writes the berth, and it is
 %% written down with it. Drawing it when she is due would let a crash between
 %% the draw and the disk re-roll her on the next boot. See tom_passage.
-consigned(State, #{at := At}, Berth, Destination) ->
+consigned(State, #{at := At}, Berth, Destination, Route) ->
     Hull = maps:get(ship, Berth),
     Ship = tom_ship:id(Hull),
     Hop = tom_ship:hop(Hull) + 1,
-    Due = At + tom_passage:passage_ms(),
+    {ok, Leagues} = tom_places:route_leagues(maps:get(world, State),
+                                             maps:get(id, Route)),
+    Due = At + tom_passage:passage_ms(Leagues),
     Fate = tom_passage:fate(#{ship => Ship,
                               owner => tom_ship:owner(Hull),
                               from => maps:get(harbour, State),
@@ -118,6 +134,8 @@ consigned(State, #{at := At}, Berth, Destination) ->
             <<"bound_for">> => Destination,
             <<"consigned_to">> => Destination,
             <<"due_at">> => Due,
+            <<"leagues">> => Leagues,
+            <<"path">> => tom_wire:path(Route),
             <<"at">> => At}},
      State#{ships := maps:put(Ship, Frozen, maps:get(ships, State))},
      [{record, {consigned_ship, Ship, Hop, Destination, At, Due, Fate}},
@@ -132,5 +150,6 @@ consigned(State, #{at := At}, Berth, Destination) ->
          <<"hop">> => Hop,
          <<"bound_for">> => Destination,
          <<"due_at">> => Due,
+         <<"leagues">> => Leagues,
          <<"at">> => At}},
       {put_to_sea, Ship, Hop, Due, Fate, handover(State, Frozen)}]}.

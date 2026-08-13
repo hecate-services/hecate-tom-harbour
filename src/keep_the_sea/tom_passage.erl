@@ -66,17 +66,32 @@
 %% waiting.
 -module(tom_passage).
 
--export([passage_ms/0,
+-export([passage_ms/1,
+         leagues_per_minute/0,
          hazard/0,
          fate/1,
          seed/1]).
 
 -export_type([departure/0, fate/0, cause/0]).
 
-%% How long any crossing takes. Two ports and a constant distance is all the
-%% game needs; when the sea has to know that Lisbon is further than Ternate,
-%% this is the number that becomes a function of the two harbours.
--define(PASSAGE_SECONDS, 90).
+%% HOW FAST A SHIP GOES, AND IT IS THE ONLY TEMPO DIAL IN THE GAME. Distance is
+%% the world's and comes off the map; this turns it into time and is the sea's.
+%%
+%% It was a flat ninety seconds for every crossing until 2026-08-13, which made
+%% Macao to Nagasaki and the Manila galleon the same voyage. At 350 leagues to
+%% the minute the spread the map actually has comes through:
+%%
+%%   macao to manila          335 leagues     under a minute
+%%   macao to malacca         527             a minute and a half
+%%   the Manila galleon     2,849             eight minutes
+%%   the Carreira home      3,582             ten minutes
+%%   the long Carreira      4,586             thirteen minutes
+%%
+%% A LONG VOYAGE IS SUPPOSED TO BE LONG. It is the only thing in the game a
+%% player commits to and cannot take back, and the suspense is the point rather
+%% than a cost to be minimised. Turn this number down when a passage has enough
+%% happening in it to be watched, and up when it has not.
+-define(LEAGUES_PER_MINUTE, 350).
 
 %% How many crossings in ten thousand end badly.
 %%
@@ -97,10 +112,15 @@
 -type cause() :: storm | pirates.
 -type fate()  :: arrives | {lost, cause()}.
 
-%% @doc How long a crossing takes, in milliseconds.
--spec passage_ms() -> pos_integer().
-passage_ms() ->
-    ?PASSAGE_SECONDS * 1000.
+%% @doc How long a crossing of this many leagues takes, in milliseconds.
+-spec passage_ms(number()) -> pos_integer().
+passage_ms(Leagues) ->
+    max(1000, round(Leagues * 60_000 / ?LEAGUES_PER_MINUTE)).
+
+%% @doc How fast a ship goes. For a shell and for a test that wants to say how
+%% far she should have got.
+-spec leagues_per_minute() -> pos_integer().
+leagues_per_minute() -> ?LEAGUES_PER_MINUTE.
 
 %% @doc How many crossings in ten thousand end badly.
 -spec hazard() -> non_neg_integer().
