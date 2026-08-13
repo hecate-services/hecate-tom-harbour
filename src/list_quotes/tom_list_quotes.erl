@@ -22,11 +22,24 @@ handle(Payload) -> tom_wire:answer(tom_port:quotes(Payload)).
 at(State, Payload, #{at := At}) ->
     {{ok, #{<<"harbour">> => maps:get(harbour, State),
             <<"at">> => At,
+            %% A PORT SAYS WHERE IT IS WHEN IT SAYS WHAT IT SELLS. A player asks
+            %% this every few seconds and had no other way to learn a position:
+            %% coordinates only ever arrived attached to a voyage, so a chart was
+            %% blank whenever the ship was in port, which is most of the time.
+            %% It is the port's own to give, it never changes, and it costs two
+            %% numbers on a reply that already carries a table of prices.
+            <<"position">> => here(State),
             <<"quotes">> => [posted(State, Good) || Good <- asked(State,
                                                                  Payload)]}},
      State, []}.
 
 %% Internal
+
+here(State) ->
+    sited(tom_places:position(maps:get(world, State), maps:get(place, State))).
+
+sited({ok, {Lat, Lng}}) -> [Lat, Lng];
+sited({error, _Why})    -> null.
 
 %% An empty list means every good this port trades. Anything else is resolved
 %% against the names this port declared, and a name that does not match is
