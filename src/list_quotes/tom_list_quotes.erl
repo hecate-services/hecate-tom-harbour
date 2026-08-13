@@ -1,7 +1,7 @@
 %% @doc What the goods on this quay go for, right now.
 %%
 %% A GOOD THIS PORT DOES NOT TRADE IS OMITTED RATHER THAN REFUSED. That is the
-%% same stance tom_market:sight_harbour takes: a peer may know goods we do not,
+%% same stance the market takes everywhere: a peer may know goods we do not,
 %% and hearing about one is not a fault. A caller asking for eight goods at a
 %% port that trades six gets six rows and can see which two are missing.
 %%

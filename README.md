@@ -48,8 +48,13 @@ A harbour declares three things, and not one of them is about worth:
 | `goods` | what a standard hinterland turns out per tick | it is a rate, the same kind of fact as a recipe's `ticks` |
 
 Plus two things it does not declare but derives: `produces`, the list the world
-service already publishes, and `census`, how many other harbours it has heard of
-that produce each good, and whether they are near.
+already carries, and `landings`, **how much of each good has actually come
+across this quay lately**. That last one is measured here and by nobody else.
+
+A world file still carries a `census`, how many harbours near and far produced a
+good when the game began. It is converted once into the trickle that implies and
+then never read again. **It is a seed and not a law**, and it fades like any
+other landing.
 
 **Neither per-harbour number can reach a single good.** They scale everything
 together. There is no per-good appetite, no desirability, no per-good
@@ -130,14 +135,23 @@ a price you had in mind.
 | rice at Ayutthaya | **0.134** | 400 a tick |
 | musk against rice, each at home | **96×** | out of a yield ratio of 800 |
 
-Geography is the census and nothing else: how many harbours produce a good, and
-whether they are in this sea or the next one.
+Geography is what arrives and nothing else. A port's opinion of a good is what
+has come across its own quay, so nutmeg is cheap where it grows, dearer at a
+neighbour a coastal trickle reaches, and dearest after a voyage that almost
+nothing makes. Below is where the world starts; it moves when ships move it.
 
 | nutmeg at | | |
 |---|---|---|
 | Banda, where it grows | **0.753** | |
 | Ternate, four producers in the same sea | **2.479** | 3.3× |
 | Lisbon, four producers and a voyage | **8.553** | 11.4× |
+
+**And a trader can change that.** Twelve cargoes of musk into Lisbon take its
+structural price from 172.90 to 95.32 and more than double its quay's natural
+depth. Keep bringing it and Lisbon becomes a place where musk is ordinary; stop,
+and it forgets, because what a quay knows about plenty is what it has seen
+lately. A port nobody calls at drifts back toward precious, which is the correct
+account of a port nobody calls at.
 
 And the galleon, which nobody designed:
 
