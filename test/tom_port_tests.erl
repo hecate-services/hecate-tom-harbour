@@ -20,6 +20,9 @@
 -define(STRANGER, <<"mri:instance:io.macula/tom/house/mendes">>).
 -define(CLARA, <<"mri:instance:io.macula/tom/ship/santa_clara">>).
 -define(MUSK, <<"mri:class:io.macula/tom/good/musk">>).
+%% The same good as the market knows it. An MRI is what the mesh calls it and an
+%% atom is what the mechanism calls it, and tom_port holds the index between.
+-define(MUSK_ID, musk).
 -define(NUTMEG, <<"mri:class:io.macula/tom/good/nutmeg">>).
 -define(SAFFRON, <<"mri:class:io.macula/tom/good/saffron">>).
 
@@ -40,9 +43,14 @@ port(Ships) -> port(Ships, macao).
 %% and refuses a pair of ports with no line between them, so a made-up world
 %% here would be testing a map nobody sails. Macao to Lisbon is a real route of
 %% 4,586 leagues and that is what these tests cross.
+%% THE MARKET OPENS AT THE TICK THE DESKS WILL CALL IT AT. A tick is counted
+%% from the epoch, so a market opened at nought and asked a question at now is
+%% handed half a century of elapsed time and has forgotten everything it was
+%% seeded with by the time it answers.
 port(Ships, Place) ->
     Standing = standing(),
-    {ok, Market} = tom_market:open(Standing),
+    #{tick := Tick} = now_at(),
+    {ok, Market} = tom_market:open(Standing, tom_crossing:defaults(), Tick),
     {ok, World} = tom_world:load_default(),
     {Goods, Names} = tom_standing:goods_index(?REALM, Standing),
     #{harbour => ?MACAO, realm => ?REALM, world => World, place => Place,
@@ -463,12 +471,35 @@ a_shallow_quay_takes_what_it_can_and_says_what_it_took_test() ->
     ?assert(near(maps:get(<<"discharged">>, Sold), 2.5448518478434186)),
     ?assert(maps:get(<<"discharged">>, Sold) < 5.0),
     ?assert(tom_ship:aboard(maps:get(<<"ship">>, Sold), ?MUSK) > 2.0),
-    ?assertMatch({{error, <<"godown_full">>}, _S, []},
-                 tom_sell_cargo:at(element(2, tom_sell_cargo:at(
-                                               Lisbon,
-                                               order(<<"b1">>, ?MUSK, 5.0),
-                                               now_at())),
-                                   order(<<"b2">>, ?MUSK, 1.0), now_at())).
+    %% AND IT GETS DEEPER, which is the point of a quay remembering what has
+    %% come across it. One cargo does not fit, and it also makes Lisbon slightly
+    %% more of a musk port. Keep bringing musk and Lisbon BECOMES a musk port:
+    %% twelve cargoes take the structural price from 172.90 to about 95 and more
+    %% than double the quay's natural depth. What used to happen was that the
+    %% far end stayed exactly as shallow for ever, however many ships came,
+    %% because the number that decided it was typed in a file.
+    Deeper = market_of(deepen(Lisbon, 12)),
+    Was = market_of(Lisbon),
+    ?assert(tom_market:natural_price(Deeper, ?MUSK_ID)
+            < tom_market:natural_price(Was, ?MUSK_ID) / 1.5),
+    ?assert(natural_stock(Deeper) > natural_stock(Was) * 2.0).
+
+market_of(State) -> maps:get(market, State).
+
+natural_stock(Market) ->
+    maps:get(natural_stock, tom_market:crossing(Market, ?MUSK_ID)).
+
+%% Twelve cargoes of musk into Lisbon, one after another.
+deepen(Port, 0) ->
+    Port;
+deepen(Port, N) ->
+    Laden = tom_ship:load(clara(), ?MUSK, 5.0),
+    {_Reply, After, _E} =
+        tom_sell_cargo:at(Port#{ships := moored(Laden)},
+                          order(list_to_binary("d" ++ integer_to_list(N)),
+                                ?MUSK, 5.0),
+                          now_at()),
+    deepen(After, N - 1).
 
 %% Helpers
 
@@ -480,7 +511,8 @@ lisbon() ->
     {ok, [Standing]} = file:consult(
                          filename:join([code:priv_dir(hecate_tom_world),
                                         "harbours", "lisbon.standing"])),
-    {ok, Market} = tom_market:open(Standing),
+    #{tick := Tick} = now_at(),
+    {ok, Market} = tom_market:open(Standing, tom_crossing:defaults(), Tick),
     {ok, World} = tom_world:load_default(),
     {Goods, Names} = tom_standing:goods_index(?REALM, Standing),
     #{harbour => ?LISBON, realm => ?REALM, world => World, place => lisbon,

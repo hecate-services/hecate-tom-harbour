@@ -127,27 +127,27 @@ the_second_trader_in_a_tick_sees_the_first_test() ->
 %% plausibly. Both routes to tick fifty must land in the same place.
 a_fact_settles_before_it_restructures_test() ->
     {ok, _, _, Traded} = tom_market:lift(macao(), nutmeg, 5.0, 3),
-    Sighting = #{nutmeg => near},
-    Straight = tom_market:sight_harbour(Traded, 50, Sighting),
-    Stepwise = tom_market:sight_harbour(tom_market:settle(Traded, 50), 50,
-                                        Sighting),
+    {ok, _, _, Straight} = tom_market:land(Traded, nutmeg, 5.0, 50),
+    {ok, _, _, Stepwise} = tom_market:land(tom_market:settle(Traded, 50),
+                                           nutmeg, 5.0, 50),
     ?assertEqual(tom_market:stock(Stepwise, nutmeg),
                  tom_market:stock(Straight, nutmeg)),
     ?assertEqual(tom_market:quote(Stepwise, nutmeg),
                  tom_market:quote(Straight, nutmeg)),
     ?assertEqual(50, tom_market:tick(Straight)).
 
-%% A sighting only touches the goods it is about, and a sighting about a good
-%% this port does not trade is not news it can use rather than an error.
-a_sighting_touches_only_its_goods_test() ->
+%% A LANDING ONLY TOUCHES ITS OWN GOOD. Bringing nutmeg here says nothing about
+%% copper, which is the whole of what makes this local: a port's opinion of a
+%% good is what has come across its quay, one good at a time, and nothing about
+%% anybody else's fields.
+a_landing_touches_only_its_own_good_test() ->
     Market = macao(),
-    Sighted = tom_market:sight_harbour(Market, 0, #{nutmeg => near,
-                                                    saffron => far}),
-    ?assert(tom_market:natural_price(Sighted, nutmeg)
+    {ok, _, _, Fed} = tom_market:land(Market, nutmeg, 40.0, 0),
+    ?assert(tom_market:natural_price(Fed, nutmeg)
             < tom_market:natural_price(Market, nutmeg)),
     ?assertEqual(tom_market:natural_price(Market, copper),
-                 tom_market:natural_price(Sighted, copper)),
-    ?assertEqual(tom_sim:goods(), tom_market:goods(Sighted)).
+                 tom_market:natural_price(Fed, copper)),
+    ?assertEqual(tom_sim:goods(), tom_market:goods(Fed)).
 
 %% THE FAULT THAT DELETED GOODS, through the facade, which is where it was
 %% reachable. A works eating ten million musk a tick makes the natural stock

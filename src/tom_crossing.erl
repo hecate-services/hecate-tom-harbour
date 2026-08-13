@@ -34,6 +34,9 @@
 
 -export([defaults/0,
          abundance/3,
+         seed/2,
+         faded/3,
+         landing/4,
          of_good/3,
          all/2,
          settling_rate/1,
@@ -41,7 +44,12 @@
          band_factors/1]).
 
 -export_type([good_id/0, config/0, census/0, survey/0, factory/0, standing/0,
-              crossing/0]).
+              crossing/0, landed/0]).
+
+%% @doc What has been landed here lately, as a multiple of the hinterland's own
+%% rate. `no_geography' is a good nobody's land grows, made wherever there are
+%% hands, whose declared yield is already the truth.
+-type landed() :: float() | no_geography.
 
 %% @doc A good's permanent identifier. Data, so any atom the caller uses.
 -type good_id() :: atom().
@@ -62,7 +70,8 @@
                     harbour_fee       := float(),
                     leak_base         := float(),
                     leak_near         := float(),
-                    leak_far          := float()}.
+                    leak_far          := float(),
+                    landing_horizon   := float()}.
 
 %% @doc How many OTHER harbours this port knows to produce each good, split into
 %% those in its own region and those beyond it.
@@ -95,6 +104,7 @@
                       goods := #{good_id() => float()},
                       produces => [good_id()],
                       census => census(),
+                      landings => #{good_id() => landed()},
                       factories => [factory()]}.
 
 %% @doc The long-run structure of one good here. Recomputed only when the
@@ -167,49 +177,86 @@ defaults() ->
       harbour_fee => 0.02,
       leak_base => 0.004,
       leak_near => 0.060,
-      leak_far => 0.006}.
+      leak_far => 0.006,
+      landing_horizon => 720.0}.
 
 %% @doc How plentiful a good is here, as a multiple of the hinterland's rate.
 %%
-%% Clause one: the hinterland grows it. Full rate, and the survey is not read.
+%% EVERY TERM IN A PRICE IS NOW LOCAL, and this was the last one that was not.
+%% It used to count how many OTHER harbours produced the good, near and far,
+%% which is a fact about the world rather than about this quay. Two things were
+%% wrong with it. Producing is not arriving: four distant harbours may grow a
+%% thing and never send any of it, because nobody thought the voyage paid. And
+%% the count was typed in a file, so no amount of trade could move it: a trader
+%% could land a thousand tons a day for a year and the long-run price here would
+%% come back to exactly where it started, which makes the one thing a trading
+%% game is for impossible.
 %%
-%% Clause two: the port looked and no harbour anywhere produces it. The good has
-%% no geography, so the produces flag carries no information and the declared
-%% yield already IS the artisan rate everywhere. A trickle here would be a
-%% double discount, and that is what once made cannon so dear at Macao that a
-%% cargo of ten could not be landed at all.
+%% What it counts now is WHAT HAS COME ACROSS THIS QUAY, as a rate, in multiples
+%% of what the hinterland itself turns out. A port sees every landing at its own
+%% desk, so it needs to ask nobody anything and nothing can be stale.
 %%
-%% Clause three: it comes from somewhere else. leak_base is what local gardens
-%% and scavenging turn out with no source at all; leak_near is per producing
-%% harbour in this port's own region, which is coastal traffic; leak_far is per
-%% producing harbour beyond it. The ten to one ratio between them IS the
-%% geography gradient, and it is the only place in the mechanism where distance
-%% is expressed.
+%% Clause one: the hinterland grows it. Full rate, and nothing else is read.
 %%
-%% Clause four: the port has not looked. It gets leak_base and nothing else,
-%% which is precisely what leak_base MEANS, what turns up with no known source
-%% at all. That is the scarce end of the ladder, so LEARNING CAN ONLY EVER MAKE
-%% A GOOD CHEAPER HERE and never dearer: an unsurveyed good is dearer than one
-%% with a single distant producer, which is dearer than one with four.
+%% Clause two: the good has no geography. It is made wherever there are hands,
+%% so the declared yield already IS the artisan rate everywhere and a trickle on
+%% top would be a double discount. That is what cannon are: made in a factory,
+%% grown by no hinterland, and priced off the rate a village smith manages.
 %%
-%% The old arrangement gave ignorance the SAME full rate as clause two, which
-%% made a port's price jump thirteenfold the moment it heard its first piece of
-%% news. On a mesh where ports learn asynchronously that was a standing
-%% arbitrage against everyone who had not caught up, and it paid to trade with
-%% the ignorant. Now the port that is behind quotes DEAR, so being behind costs
-%% its owner rather than its counterparty.
--spec abundance(config(), boolean(), survey()) -> float().
-abundance(_Config, true, _Survey) ->
+%% Clause three: everything else. leak_base is what local gardens and scavenging
+%% turn out with no source at all, and the landed rate is added to it. A port
+%% that has seen nothing land quotes leak_base, which is the dearest price it
+%% will ever quote, so ARRIVING CAN ONLY EVER MAKE A GOOD CHEAPER HERE.
+-spec abundance(config(), boolean(), landed()) -> float().
+abundance(_Config, true, _Landed) ->
     1.0;
-abundance(_Config, false, {0, 0}) ->
+abundance(_Config, false, no_geography) ->
     1.0;
-abundance(Config, false, {Near, Far}) when is_integer(Near), Near >= 0,
-                                           is_integer(Far), Far >= 0 ->
-    maps:get(leak_base, Config)
-        + maps:get(leak_near, Config) * Near
-        + maps:get(leak_far, Config) * Far;
-abundance(Config, false, unsurveyed) ->
-    maps:get(leak_base, Config).
+abundance(Config, false, Landed) when is_number(Landed), Landed >= 0.0 ->
+    maps:get(leak_base, Config) + Landed.
+
+%% @doc What a census entry is worth as a landed rate, for genesis and for
+%% nothing else.
+%%
+%% THE CENSUS IS A SEED AND NOT A LAW. A world has to open with trade already
+%% having happened or every port quotes everything at leak_base and the first
+%% evening is flat. So a world file still says how many harbours near and far
+%% produced a good when the game began, and it is converted, once, into the
+%% trickle that implies. From then on the rate is whatever the quay has actually
+%% seen, and the seed decays away like any other landing.
+-spec seed(config(), survey()) -> landed().
+seed(_Config, {0, 0}) ->
+    no_geography;
+seed(Config, {Near, Far}) when is_integer(Near), is_integer(Far) ->
+    maps:get(leak_near, Config) * Near + maps:get(leak_far, Config) * Far;
+seed(_Config, unsurveyed) ->
+    0.0.
+
+%% @doc What is left of a landed rate after some ticks of nobody bringing any.
+%%
+%% A MEMORY AND NOT A LEDGER. What a quay knows about how plentiful a thing is
+%% here is what has come in lately, so it fades. A port nobody calls at drifts
+%% back to leak_base and everything it does not grow becomes precious, which is
+%% the correct account of a port nobody calls at.
+-spec faded(config(), landed(), number()) -> landed().
+faded(_Config, no_geography, _Elapsed) ->
+    no_geography;
+faded(Config, Landed, Elapsed) ->
+    Landed * math:exp(-Elapsed / maps:get(landing_horizon, Config)).
+
+%% @doc A cargo landed here, as an addition to the rate.
+%%
+%% In multiples of what the hinterland turns out, because that is what abundance
+%% is measured in: Q tons spread over the horizon, against the rate the land
+%% behind the port manages in the same time.
+-spec landing(config(), standing(), good_id(), number()) -> float().
+landing(Config, Standing, Good, Tons) ->
+    Grown = maps:get(Good, maps:get(goods, Standing), 0.0)
+        * maps:get(hinterland, Standing),
+    added(Tons / maps:get(landing_horizon, Config), Grown).
+
+added(_Rate, Grown) when Grown =< 0.0 -> 0.0;
+added(Rate, Grown)                    -> Rate / Grown.
 
 %% @doc The crossing for one good at one port.
 -spec of_good(config(), standing(), good_id()) -> crossing().
@@ -295,14 +342,14 @@ curve(Config, Standing, Good) ->
 %% The whole of a good's individuality: its yield, the land behind the port, and
 %% how far away everyone else who makes it stands.
 %%
-%% A good the census does not mention is UNSURVEYED, not surveyed-and-empty, and
-%% the default below is the whole of the difference.
+%% A good with nothing landed against it is a good nothing has been brought to
+%% this quay, which is the scarce end and is exactly what leak_base means.
 supply_scale(Config, Standing, Good) ->
-    Survey = maps:get(Good, maps:get(census, Standing, #{}), unsurveyed),
+    Landed = maps:get(Good, maps:get(landings, Standing, #{}), 0.0),
     Produced = lists:member(Good, maps:get(produces, Standing, [])),
     maps:get(Good, maps:get(goods, Standing))
         * maps:get(hinterland, Standing)
-        * abundance(Config, Produced, Survey).
+        * abundance(Config, Produced, Landed).
 
 factory_flow(Side, Standing, Good) ->
     lists:foldl(fun(Works, Sum) -> Sum + flow(Works, Side, Good) end,

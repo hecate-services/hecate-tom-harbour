@@ -257,7 +257,7 @@ it touches anything, because a crossing rewritten out of order retroactively
 rewrites every tick since the last stamp:
 
 ```erlang
-9>  M2 = tom_market:sight_harbour(M1, 50, #{nutmeg => far}).
+9>  {ok, _, _, M2} = tom_market:land(M1, nutmeg, 40, 50).
 10> M3 = tom_market:raise_factory(M2, 60, #{id => cast_cannon,
                                             consumes => #{copper => 0.375},
                                             yields => #{cannon => 0.125}}).

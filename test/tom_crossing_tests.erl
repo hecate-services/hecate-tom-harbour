@@ -15,6 +15,7 @@ defaults_are_the_shipped_constants_test() ->
                    godown_multiple => 10.0,
                    appetite => 30.0,
                    harbour_fee => 0.02,
+                   landing_horizon => 720.0,
                    leak_base => 0.004,
                    leak_near => 0.060,
                    leak_far => 0.006},
@@ -32,19 +33,37 @@ abundance_of_a_local_good_is_whole_test() ->
 %% trickle here would be a second discount on top of a rate that is already the
 %% low one.
 abundance_of_a_good_with_no_geography_is_whole_test() ->
-    ?assertEqual(1.0, tom_crossing:abundance(config(), false, {0, 0})).
+    ?assertEqual(1.0, tom_crossing:abundance(config(), false, no_geography)),
+    %% And a census of nought seeds exactly that, which is how a world file
+    %% still says it.
+    ?assertEqual(no_geography, tom_crossing:seed(config(), {0, 0})).
 
-%% Clause three: it comes from somewhere else, and how far away decides how much
-%% of it drifts in. Ten to one between a neighbour and a voyage is the only
-%% place distance is expressed in the whole mechanism.
+%% Clause three: it came across this quay, and how much of it did decides how
+%% ordinary it is here. What a world file seeds that with is still a count of
+%% harbours near and far, ten to one between a neighbour and a voyage, because
+%% that is a fair statement of what was arriving when the game began. After
+%% genesis nothing reads it again.
 abundance_of_an_import_is_a_trickle_test() ->
-    Base = tom_crossing:abundance(config(), false, {0, 1}),
-    Near = tom_crossing:abundance(config(), false, {1, 0}),
-    ?assertEqual(0.004 + 0.006, Base),
-    ?assertEqual(0.004 + 0.060, Near),
-    ?assert(Near > Base * 6),
-    ?assert(tom_crossing:abundance(config(), false, {4, 0})
-            > tom_crossing:abundance(config(), false, {1, 0})).
+    Far = tom_crossing:seed(config(), {0, 1}),
+    Near = tom_crossing:seed(config(), {1, 0}),
+    ?assertEqual(0.004 + 0.006, tom_crossing:abundance(config(), false, Far)),
+    ?assertEqual(0.004 + 0.060, tom_crossing:abundance(config(), false, Near)),
+    ?assert(Near > Far * 6),
+    ?assert(tom_crossing:abundance(config(), false,
+                                   tom_crossing:seed(config(), {4, 0}))
+            > tom_crossing:abundance(config(), false, Near)).
+
+%% A QUAY FORGETS. What it knows about plenty is what it has seen lately, so a
+%% rate left alone decays toward nothing and the price drifts back to the scarce
+%% end. A good with no geography does not: the smith goes on making cannon.
+a_rate_left_alone_fades_test() ->
+    Rate = tom_crossing:seed(config(), {4, 0}),
+    Later = tom_crossing:faded(config(), Rate, 720.0),
+    ?assert(Later < Rate),
+    ?assert(Later > 0.0),
+    ?assert(tom_crossing:faded(config(), Rate, 20000.0) < Rate / 100),
+    ?assertEqual(no_geography,
+                 tom_crossing:faded(config(), no_geography, 20000.0)).
 
 %% IGNORANCE IS THE SCARCE END, AND IT IS A STATE RATHER THAN A COUNT. A port
 %% that has not looked gets what turns up with no known source at all, which is
@@ -55,11 +74,11 @@ abundance_of_an_import_is_a_trickle_test() ->
 %% and a port's price jumped thirteenfold on its first piece of news, which is a
 %% standing arbitrage against every port that had not caught up yet.
 ignorance_is_the_scarce_end_test() ->
-    Blind = tom_crossing:abundance(config(), false, unsurveyed),
+    Blind = tom_crossing:abundance(config(), false, 0.0),
     ?assertEqual(0.004, Blind),
-    ?assert(Blind < tom_crossing:abundance(config(), false, {0, 1})),
-    ?assert(Blind < tom_crossing:abundance(config(), false, {1, 0})),
-    Ladder = [tom_crossing:abundance(config(), false, {0, N})
+    ?assertEqual(0.0, tom_crossing:seed(config(), unsurveyed)),
+    Ladder = [tom_crossing:abundance(config(), false,
+                                     tom_crossing:seed(config(), {0, N}))
               || N <- lists:seq(1, 8)],
     ?assertEqual(Ladder, lists:sort(Ladder)),
     ?assert(Blind < hd(Ladder)).

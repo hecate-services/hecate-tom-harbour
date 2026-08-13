@@ -38,6 +38,7 @@
 
 -export([open/1,
          open/2,
+         open/3,
          config/1,
          standing/1,
          tick/1,
@@ -54,7 +55,6 @@
          depth/3,
          lift/4,
          land/4,
-         sight_harbour/3,
          raise_factory/3,
          demolish_factory/3,
          resurvey/3]).
@@ -79,7 +79,7 @@
 
 %% @doc Open a port on the shipped constants.
 -spec open(tom_crossing:standing()) -> {ok, market()} | {error, [problem()]}.
-open(Standing) -> open(Standing, tom_crossing:defaults()).
+open(Standing) -> open(Standing, tom_crossing:defaults(), 0).
 
 %% @doc Open a port.
 %%
@@ -89,8 +89,20 @@ open(Standing) -> open(Standing, tom_crossing:defaults()).
 %% will stop reading the errors.
 -spec open(tom_crossing:standing(), tom_crossing:config()) ->
           {ok, market()} | {error, [problem()]}.
-open(Standing, Config) ->
-    opened(Config, Standing, problems(Config, Standing)).
+open(Standing, Config) -> open(Standing, Config, 0).
+
+%% @doc Open a port at a tick.
+%%
+%% A MARKET OPENS AT THE TICK IT IS AT, and the third argument exists because
+%% forgetting is now a thing markets do. A tick is the wall clock divided by the
+%% length of one, so it is counted from the epoch and not from the game: a market
+%% opened at nought and then settled to now would be handed fifty-six years of
+%% elapsed time on its first breath, and the trickle a world file seeded it with
+%% would decay to nothing before anybody had bought anything.
+-spec open(tom_crossing:standing(), tom_crossing:config(), integer()) ->
+          {ok, market()} | {error, [problem()]}.
+open(Standing, Config, AtTick) ->
+    opened(Config, Standing, AtTick, problems(Config, Standing)).
 
 %% @doc The constants this market runs on.
 -spec config(market()) -> tom_crossing:config().
@@ -148,8 +160,37 @@ settle(#{tick := Now} = Market, AtTick)
     Config = config(Market),
     Elapsed = AtTick - Now,
     Onward = fun(_Good, Quay) -> tom_quay:advance(Config, Quay, Elapsed) end,
-    Market#{tick := AtTick,
-            quays := maps:map(Onward, maps:get(quays, Market))}.
+    forgotten(Market#{tick := AtTick,
+                      quays := maps:map(Onward, maps:get(quays, Market))},
+              Elapsed).
+
+%% WHAT A QUAY KNOWS ABOUT PLENTY IS WHAT IT HAS SEEN LATELY, so it fades. A
+%% port nobody calls at drifts back to leak_base and everything it does not grow
+%% becomes precious, which is the correct account of a port nobody calls at. It
+%% is also what keeps the world file's census a seed rather than a law: the
+%% opening trickle decays like any other landing unless play sustains it.
+%%
+%% Only the goods with something to forget are touched, and a good at rest costs
+%% nothing, which is the same bargain the quays already strike.
+forgotten(Market, Elapsed) ->
+    Config = config(Market),
+    Standing = standing(Market),
+    Landings = maps:get(landings, Standing, #{}),
+    Moved = [Good || {Good, Landed} <- maps:to_list(Landings),
+                     is_number(Landed), Landed > 0.0],
+    faded(Market, Config, Standing, Landings, Moved, Elapsed).
+
+faded(Market, _Config, _Standing, _Landings, [], _Elapsed) ->
+    Market;
+faded(Market, Config, Standing, Landings, Moved, Elapsed) ->
+    Older = maps:map(fun(_G, L) -> tom_crossing:faded(Config, L, Elapsed) end,
+                     Landings),
+    Config = config(Market),
+    Rebuild = fun(Good, Acc) ->
+                      recrossed(Config, Standing#{landings => Older}, Good, Acc)
+              end,
+    Market#{standing := Standing#{landings => Older},
+            quays := lists:foldl(Rebuild, maps:get(quays, Market), Moved)}.
 
 %% @doc What a good goes for, at the tick this market is already settled to.
 -spec quote(market(), tom_crossing:good_id()) -> float().
@@ -193,22 +234,30 @@ lift(Market, Good, Requested, AtTick) ->
           {ok, float(), float(), market()}
               | {error, godown_full | unknown_good | bad_quantity}.
 land(Market, Good, Requested, AtTick) ->
-    landing(Market, Good, Requested, AtTick, trades(Market, Good)).
+    brought(landing(Market, Good, Requested, AtTick, trades(Market, Good)),
+            Good, AtTick).
 
-%% @doc This port has learned that other harbours produce these goods.
-%%
-%% Goods this port does not trade are ignored rather than refused. A peer may
-%% know goods we do not, and hearing about one is not an error, it is simply not
-%% news we can use yet.
--spec sight_harbour(market(), integer(),
-                    #{tom_crossing:good_id() => near | far}) -> market().
-sight_harbour(Market, AtTick, Sightings) ->
-    Sighted = maps:with(goods(Market), Sightings),
+%% WHAT ARRIVES IS WHAT MAKES A THING COMMON HERE, and this is the whole of the
+%% feedback the mechanism was missing. A cargo does two things now: it puts a
+%% heap on the quay, which is the short run and recovers, and it raises the rate
+%% at which this port has been seeing the good, which is the long run and moves
+%% the crossing itself. Land enough here often enough and the port becomes a
+%% place where the thing is ordinary.
+brought({ok, Filled, Coin, Market}, Good, AtTick) ->
     Standing = standing(Market),
-    Census = lists:foldl(fun sighted/2, maps:get(census, Standing, #{}),
-                         maps:to_list(Sighted)),
-    restructure(Market, AtTick, Standing#{census => Census},
-                lists:sort(maps:keys(Sighted))).
+    Was = maps:get(Good, maps:get(landings, Standing, #{}), 0.0),
+    Now = arrived(Was, tom_crossing:landing(config(Market), Standing, Good,
+                                            Filled)),
+    Landings = maps:put(Good, Now, maps:get(landings, Standing, #{})),
+    {ok, Filled, Coin,
+     restructure(Market, AtTick, Standing#{landings => Landings}, [Good])};
+brought(Other, _Good, _AtTick) ->
+    Other.
+
+%% A good with no geography stays that way. Landing cannon at a port does not
+%% teach it that cannon grow somewhere.
+arrived(no_geography, _Added) -> no_geography;
+arrived(Was, Added)           -> Was + Added.
 
 %% @doc A works opens behind the port.
 %%
@@ -248,15 +297,15 @@ resurvey(Market, AtTick, Survey) ->
 
 %% Internal
 
-opened(Config, Standing, []) ->
+opened(Config, Standing, AtTick, []) ->
     Sound = normal_config(Config),
-    Here = normal_standing(Standing),
+    Here = seeded(Sound, normal_standing(Standing)),
     Opened = fun(_Good, Crossing) -> tom_quay:open(Crossing) end,
     {ok, #{config => Sound,
            standing => Here,
-           tick => 0,
+           tick => AtTick,
            quays => maps:map(Opened, tom_crossing:all(Sound, Here))}};
-opened(_Config, _Standing, Problems) ->
+opened(_Config, _Standing, _AtTick, Problems) ->
     {error, Problems}.
 
 trades(Market, Good) -> maps:is_key(Good, maps:get(quays, Market)).
@@ -289,6 +338,19 @@ restocked(Market, Good, Quay) ->
     Market#{quays := maps:put(Good, Quay, maps:get(quays, Market))}.
 
 %% SETTLE FIRST, ALWAYS. This is the one line that makes the ordering rule real.
+%% @doc The landed rates a world file's census implies, applied once.
+%%
+%% After this nothing reads the census again. It said how many harbours near and
+%% far produced a good when the game began, which is a fine way to say what was
+%% arriving here THEN, and a hopeless way to say what is arriving now.
+seeded(Config, Standing) ->
+    Census = maps:get(census, Standing, #{}),
+    Landings = maps:from_list(
+                 [{Good, tom_crossing:seed(Config, maps:get(Good, Census,
+                                                            unsurveyed))}
+                  || Good <- maps:keys(maps:get(goods, Standing))]),
+    Standing#{landings => Landings}.
+
 restructure(Market0, AtTick, Standing, Affected) ->
     Market = settle(Market0, AtTick),
     Config = config(Market),
@@ -300,12 +362,6 @@ recrossed(Config, Standing, Good, Quays) ->
     Crossing = tom_crossing:of_good(Config, Standing, Good),
     Quays#{Good => tom_quay:re_cross(maps:get(Good, Quays), Crossing)}.
 
-sighted({Good, near}, Census) ->
-    {Near, Far} = maps:get(Good, Census, {0, 0}),
-    Census#{Good => {Near + 1, Far}};
-sighted({Good, far}, Census) ->
-    {Near, Far} = maps:get(Good, Census, {0, 0}),
-    Census#{Good => {Near, Far + 1}}.
 
 admitted(Market, Factory) ->
     Strangers = [Good || Good <- factory_goods(Factory),
@@ -365,7 +421,11 @@ config_rules() ->
      {harbour_fee, fun bounded_fee/1},
      {leak_base, fun positive/1},
      {leak_near, fun positive/1},
-     {leak_far, fun positive/1}].
+     {leak_far, fun positive/1},
+     %% How long a quay remembers what was landed on it. Long enough that a
+     %% world holds its shape across an evening, short enough that a port
+     %% nobody calls at goes quiet.
+     {landing_horizon, fun positive/1}].
 
 positive(Value) -> is_number(Value) andalso Value > 0.
 

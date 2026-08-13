@@ -23,15 +23,21 @@ pbar(Port, Good) -> tom_market:natural_price(market(Port), Good).
 %% THERE IS NOWHERE TO PUT A PRICE. The vocabulary a market accepts is closed
 %% and every word in it is a headcount, an extent of land, a rate, a list of
 %% harbours or a works. Not one of them says what anything is worth.
+%%
+%% A STANDING IS WHAT THE FILE SAYS; A MARKET KEEPS ONE MORE THING. `landings'
+%% is not in the file and cannot be: it is what this quay has actually seen come
+%% across it, measured here, and the census is turned into its opening value
+%% once and never read again.
 the_vocabulary_has_no_room_for_a_price_test() ->
     ?assertEqual([census, factories, goods, hinterland, produces, town],
                  lists:sort(maps:keys(tom_sim:standing(macao)))),
     {ok, Market} = tom_market:open(tom_sim:standing(macao)),
-    ?assertEqual([census, factories, goods, hinterland, produces, town],
+    ?assertEqual([census, factories, goods, hinterland, landings, produces,
+                  town],
                  lists:sort(maps:keys(tom_market:standing(Market)))),
     ?assertEqual([appetite, cover_ticks, demand_elasticity, godown_multiple,
-                  harbour_fee, leak_base, leak_far, leak_near, reserve_ticks,
-                  stock_sensitivity, supply_elasticity],
+                  harbour_fee, landing_horizon, leak_base, leak_far, leak_near,
+                  reserve_ticks, stock_sensitivity, supply_elasticity],
                  lists:sort(maps:keys(tom_market:config(Market)))).
 
 %% A market ignores anything it was not asked for, so a price smuggled into a
@@ -170,42 +176,58 @@ the_foundry_strangles_itself_test() ->
 %% A SURVEYED COUNT OF NOUGHT IS NOT SCARCITY, AND THAT IS ON PURPOSE. A port
 %% that looked and found nobody has established that the good has no geography
 %% at all, which is what cannon are: made in a factory, produced by no harbour,
-%% and priced off the rate a village smith manages. Among the goods that DO come
-%% from somewhere, it is the port that has heard of one distant producer that
-%% pays most, and the price falls back as more facts arrive.
-facts_arriving_move_the_price_test() ->
-    Ignorant = tom_market:sight_harbour(market(lisbon), 0, #{}),
-    One = tom_market:sight_harbour(bare(lisbon), 0, #{nutmeg => far}),
-    Again = fun(_N, Acc) ->
-                    tom_market:sight_harbour(Acc, 0, #{nutmeg => far})
-            end,
-    Four = lists:foldl(Again, One, lists:seq(1, 3)),
-    ?assert(tom_market:natural_price(One, nutmeg)
-            > tom_market:natural_price(Four, nutmeg)),
-    ?assert(near(tom_market:natural_price(Four, nutmeg),
-                 tom_market:natural_price(Ignorant, nutmeg))),
-    ?assert(near(pbar(lisbon, cannon), grown(lisbon, cannon))).
+%% and priced off the rate a village smith manages. Landing cannon at a port
+%% does not teach it that cannon grow somewhere.
+a_good_with_no_geography_is_priced_off_the_smith_test() ->
+    ?assert(near(pbar(lisbon, cannon), grown(lisbon, cannon))),
+    ?assert(near(tom_market:natural_price(landed(market(lisbon), cannon, 20.0),
+                                          cannon),
+                 pbar(lisbon, cannon))).
 
-%% LEARNING ONLY EVER MAKES A GOOD CHEAPER. A port that has not surveyed a good
-%% quotes the dearest price it will ever quote for it, because the only supply
-%% it knows of is what turns up with no source at all, and every harbour it
-%% hears about after that adds to the trickle.
-%%
-%% The old arrangement had ignorance and "surveyed, nobody makes it" share one
-%% value, so a first sighting sent nutmeg at Lisbon UP by a factor of thirteen.
-%% Two ports learning at different times then quoted prices thirteen apart with
-%% nothing between them but a lost packet, and the profit was in trading with
-%% whichever one was behind.
-knowing_more_never_makes_a_good_dearer_test() ->
-    Walk = fun(Where, [Last | _] = Seen) ->
-                   [tom_market:sight_harbour(Last, 0, #{nutmeg => Where})
-                    | Seen]
-           end,
-    Markets = lists:foldl(Walk, [bare(lisbon)], [far, far, near, far]),
+%% LANDING A CARGO MAKES A THING COMMON HERE, and this is the feedback the
+%% mechanism did not have. A cargo used to move the heap and nothing else, so
+%% the price dipped and floated back to exactly where it started: no amount of
+%% trade could change what a port WAS. The quay remembers what has come across
+%% it now, so a trader who keeps bringing nutmeg to Lisbon makes Lisbon a place
+%% where nutmeg is ordinary.
+landing_a_cargo_makes_a_good_cheaper_here_test() ->
+    Bare = bare(lisbon),
+    Fed = landed(Bare, nutmeg, 40.0),
+    ?assert(tom_market:natural_price(Fed, nutmeg)
+            < tom_market:natural_price(Bare, nutmeg)).
+
+%% ARRIVING ONLY EVER MAKES A GOOD CHEAPER. A port nothing has been brought to
+%% quotes the dearest price it will ever quote, because the only supply it knows
+%% of is what turns up with no source at all, and every cargo after that adds to
+%% the trickle. The ladder only goes one way.
+arriving_never_makes_a_good_dearer_test() ->
+    Walk = fun(_N, [Last | _] = Seen) -> [landed(Last, nutmeg, 10.0) | Seen] end,
+    Markets = lists:foldl(Walk, [bare(lisbon)], lists:seq(1, 4)),
     Prices = [tom_market:natural_price(M, nutmeg)
               || M <- lists:reverse(Markets)],
-    ?assertEqual(Prices, lists:reverse(lists:sort(Prices))),
-    ?assert(hd(Prices) > lists:last(Prices) * 2.0).
+    ?assertEqual(Prices, lists:reverse(lists:sort(Prices))).
+
+%% AND A PORT NOBODY CALLS AT FORGETS. What a quay knows about plenty is what it
+%% has seen lately, so it fades, and the world file's census is a seed rather
+%% than a law: left alone, everything a port does not grow drifts back toward
+%% precious. That is the correct account of a port nobody calls at.
+a_port_nobody_calls_at_forgets_test() ->
+    Now = market(lisbon),
+    Later = tom_market:settle(Now, 20000),
+    ?assert(tom_market:natural_price(Later, nutmeg)
+            > tom_market:natural_price(Now, nutmeg)),
+    %% A good with no geography does not drift, because abundance never reads a
+    %% rate for one: the smith goes on making cannon whether ships call or not.
+    ?assert(near(tom_market:natural_price(Later, cannon),
+                 tom_market:natural_price(Now, cannon))),
+    %% And what a port GROWS is untouched for the same reason, which is why
+    %% Macao's musk is where it was and its nutmeg is not.
+    Macao = market(macao),
+    Old = tom_market:settle(Macao, 20000),
+    ?assert(near(tom_market:natural_price(Old, musk),
+                 tom_market:natural_price(Macao, musk))),
+    ?assert(tom_market:natural_price(Old, nutmeg)
+            > tom_market:natural_price(Macao, nutmeg)).
 
 %% A good the port itself grows is never a trickle, whatever the census says.
 what_a_port_grows_is_never_scarce_there_test() ->
@@ -215,6 +237,10 @@ what_a_port_grows_is_never_scarce_there_test() ->
 
 %% The same port with nothing surveyed at all: it knows what it grows and
 %% nothing whatever about anybody else.
+landed(Market, Good, Tons) ->
+    {ok, _Filled, _Coin, After} = tom_market:land(Market, Good, Tons, 0),
+    After.
+
 bare(Port) ->
     Standing = tom_sim:standing(Port),
     {ok, Market} = tom_market:open(Standing#{census => #{}}),

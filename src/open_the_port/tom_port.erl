@@ -185,7 +185,13 @@ init([]) ->
     Harbour = tom_standing:harbour(),
     {ok, Standing} = tom_standing:standing(),
     {ok, World} = tom_world:load_default(),
-    {ok, Market} = tom_market:open(Standing),
+    TickMs = tom_standing:tick_ms(),
+    %% AT THE TICK IT IS AT, not at nought. A tick is counted from the epoch, so
+    %% a market opened at nought and settled to now would be handed half a
+    %% century of elapsed time and would forget everything it was seeded with
+    %% before the first quote.
+    {ok, Market} = tom_market:open(Standing, tom_crossing:defaults(),
+                                   tom_wire:now_ms() div TickMs),
     {ok, Log} = tom_ledger:open(tom_standing:data_dir(), Harbour),
     {Goods, Names} = tom_standing:goods_index(Realm, Standing),
     Fresh = #{harbour => Harbour,
@@ -200,7 +206,7 @@ init([]) ->
               market => Market,
               goods => Goods,
               names => Names,
-              tick_ms => tom_standing:tick_ms(),
+              tick_ms => TickMs,
               ships => #{},
               receipts => #{},
               taken => #{},
