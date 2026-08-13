@@ -63,6 +63,7 @@
                    from := tom_harbours:id(),
                    to := tom_harbours:id(),
                    via := [place_id()],
+                   path := [position()],
                    character := binary()}.
 
 %% @doc Anywhere a route may name: a waypoint, or a harbour.
@@ -100,21 +101,20 @@ position(World, Id) ->
 leagues(World, From, To) ->
     apart(position(World, From), position(World, To)).
 
-%% @doc How far a route is, in leagues, over water.
+%% @doc How far a route is, in leagues, along its own line.
 %%
-%% THE SUM OF ITS SEGMENTS AND NEVER THE STRAIGHT LINE. Goa to Lisbon in a
-%% straight line is 1,502 leagues across Arabia and the Sahara, and no ship has
-%% ever done it. The route says laccadive_sea, mozambique_channel,
-%% cape_of_good_hope, st_helena, the_doldrums, and the distance is what a hull
-%% actually sails: down the length of Africa and back up the Atlantic.
+%% THE LENGTH OF THE LINE AND NEVER THE STRAIGHT LINE. Goa to Lisbon straight is
+%% 1,502 leagues across Arabia and the Sahara, and no ship has ever done it. Down
+%% the length of Africa and back up the Atlantic it is 3,582, which is what the
+%% Carreira actually was.
 %%
-%% THAT IS THE ENTIRE JOB OF `via'. It was written as "which waters lie between
-%% two ports, in order" and read as decoration. It is the difference between a
-%% game where the Cape matters and a game where the map is a tablecloth.
+%% MEASURED ALONG `path', so there is one source of truth. The line is generated
+%% over a real marine network and the distance is its length, which means the two
+%% cannot drift apart and nobody has to keep a number in step with a map.
 -spec route_leagues(tom_world:world(), route_id()) ->
           {ok, float()} | {error, term()}.
 route_leagues(World, Id) ->
-    summed(World, legs(World, Id), 0.0).
+    measured(route(World, Id)).
 
 %% @doc Every waypoint, ordered by identifier.
 -spec waypoints(tom_world:world()) -> [waypoint()].
@@ -185,16 +185,12 @@ calls_at(World, Id, Place) ->
 
 %% Internal
 
-%% A leg that names a place this world has never heard of stops the sum rather
-%% than being skipped: a route with a hole in it is a route nobody should be
-%% quoted a distance for.
-summed(_World, [], Leagues) ->
-    {ok, Leagues};
-summed(World, [{From, To} | Rest], Leagues) ->
-    added(World, Rest, Leagues, leagues(World, From, To)).
+measured({ok, #{path := Path}}) -> {ok, walked(Path, 0.0)};
+measured({error, _} = Err)      -> Err.
 
-added(World, Rest, Leagues, {ok, Leg})  -> summed(World, Rest, Leagues + Leg);
-added(_World, _Rest, _Leagues, Problem) -> Problem.
+walked([_Last], Leagues)      -> Leagues;
+walked([A, B | Rest], Leagues) -> walked([B | Rest], Leagues + haversine(A, B));
+walked([], Leagues)            -> Leagues.
 
 sited({ok, Waypoint}, _Harbour)  -> {ok, maps:get(at, Waypoint)};
 sited({error, _}, {ok, Harbour}) -> {ok, maps:get(at, Harbour)};

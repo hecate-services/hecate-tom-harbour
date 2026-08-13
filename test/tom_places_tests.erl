@@ -81,6 +81,38 @@ the_way_home_is_not_the_way_out_test() ->
     {ok, Home} = tom_places:route_leagues(World, manila_to_macao),
     ?assert(Home > Out).
 
+%% A LINE THAT DOES NOT START AT THE PORT IS A LINE FOR A DIFFERENT ROUTE. The
+%% path is generated, so nothing but a test stops a regeneration silently
+%% attaching the Carreira's line to the Brazil run.
+a_route_begins_and_ends_at_its_own_ports_test() ->
+    World = world(),
+    [begin
+         {ok, First} = tom_places:position(World, maps:get(from, R)),
+         {ok, Last} = tom_places:position(World, maps:get(to, R)),
+         ?assert(near(hd(maps:get(path, R)), First)),
+         ?assert(near(lists:last(maps:get(path, R)), Last))
+     end || R <- tom_places:routes(World)],
+    ok.
+
+%% THE GALLEON'S LINE LEAVES THE MAP, AND THAT IS THE POINT. Her path runs west
+%% past 180 to a longitude of -239, which is Manila plus a lap of the earth.
+%% Wrapping it back into the box would put a seam in the middle of the only
+%% route that crosses it, and every reader would then need a special case:
+%% measuring it would give four times the distance, the wrong way round the
+%% world, and drawing it would put a line across Asia and Africa. Unwrapped, the
+%% line is continuous and both jobs are ordinary arithmetic.
+the_galleons_line_leaves_the_map_on_purpose_test() ->
+    World = world(),
+    {ok, Galleon} = tom_places:route(World, manila_to_acapulco),
+    {ok, Home} = tom_places:route(World, acapulco_to_manila),
+    Longitudes = [Lng || {_Lat, Lng} <- maps:get(path, Galleon)
+                             ++ maps:get(path, Home)],
+    ?assert(lists:min(Longitudes) < -180 orelse lists:max(Longitudes) > 180),
+    %% And it is still the right length, because a great circle does not care
+    %% where somebody decided to cut the map.
+    {ok, Leagues} = tom_places:route_leagues(World, manila_to_acapulco),
+    ?assert(Leagues > 2500 andalso Leagues < 3100).
+
 %% A route names harbours and waters in one list, so both kinds answer the same
 %% question about where they are.
 either_kind_of_place_has_a_position_test() ->
@@ -89,10 +121,12 @@ either_kind_of_place_has_a_position_test() ->
     ?assertMatch({ok, {_Lat, _Lng}}, tom_places:position(World, the_kuroshio)),
     ?assertEqual({error, no_such_place}, tom_places:position(World, atlantis)).
 
-%% Same for a route. Which waters, in order, and nothing about how long.
+%% Same for a route. Which waters, in order, the line they make on the water,
+%% and nothing whatever about how long any of it takes.
 a_route_is_only_geography_test() ->
     World = world(),
-    [?assertEqual([character, from, id, name, to, via], lists:sort(maps:keys(R)))
+    [?assertEqual([character, from, id, name, path, to, via],
+                  lists:sort(maps:keys(R)))
      || R <- tom_places:routes(World)],
     ok.
 
@@ -156,3 +190,14 @@ bad_map() ->
      {route, #{id => round_in_circles, name => <<"Round in circles">>,
                from => macao, to => macao, via => [],
                character => <<"Out of Macao and into Macao.">>}}].
+
+%% Within a degree, and modulo a lap of the earth. A marine network puts its
+%% endpoint in the water off a port rather than on the quay, which is right and
+%% is not the same coordinate; and a path that crosses the antimeridian runs its
+%% longitude past 180 rather than wrapping, which is also right. See
+%% the_galleons_line_leaves_the_map_on_purpose_test.
+near({LatA, LngA}, {LatB, LngB}) ->
+    abs(LatA - LatB) < 1.0 andalso lap(abs(LngA - LngB)) < 1.0.
+
+lap(Degrees) when Degrees > 180 -> abs(Degrees - 360);
+lap(Degrees)                    -> Degrees.
