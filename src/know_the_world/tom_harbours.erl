@@ -42,6 +42,7 @@
 -type harbour() :: #{id := id(),
                      name := binary(),
                      region := tom_world:region_id(),
+                     at := tom_places:position(),
                      character := binary(),
                      produces := [tom_goods:id()]}.
 

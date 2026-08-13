@@ -225,6 +225,7 @@
 %% pure entrepot makes nothing of its own and is rich anyway.
 
 {harbour, #{id => macao, name => <<"Macao">>, region => china,
+            at => {22.2, 113.55},
             character => <<"The Pearl River mouth. Everything Chinese "
                            "leaves through here.">>,
             produces => [raw_silk, silk_piece_goods, porcelain, tea, gold,
@@ -232,14 +233,17 @@
                          kaolin]}}.
 
 {harbour, #{id => nagasaki, name => <<"Nagasaki">>, region => japan,
+            at => {32.75, 129.87},
             character => <<"Silk in, silver out. The shortest rich water "
                            "in the world.">>,
             produces => [silver, copper, lacquerware, sulphur]}}.
 {harbour, #{id => hirado, name => <<"Hirado">>, region => japan,
+            at => {33.37, 129.55},
             character => <<"The older Japanese door, and a quieter one.">>,
             produces => [silver, copper, sulphur]}}.
 
 {harbour, #{id => hoi_an, name => <<"Hoi An">>, region => southeast_asia,
+            at => {15.88, 108.34},
             character => <<"Cochinchina. Silk and the finest incense.">>,
             produces => [raw_silk, eaglewood, benzoin]}}.
 {harbour, #{id => ayutthaya, name => <<"Ayutthaya">>,
@@ -247,16 +251,19 @@
             character => <<"Siam, up the river. Hides and rice.">>,
             produces => [deer_hides, rice, benzoin, tin, teak]}}.
 {harbour, #{id => malacca, name => <<"Malacca">>, region => southeast_asia,
+            at => {2.2, 102.25},
             character => <<"The strait. Nearly everything passes, and pays "
                            "to pass.">>,
             produces => [pepper, tin, cloves, nutmeg, mace, sandalwood,
                          eaglewood, benzoin, trepang, tortoiseshell, beeswax,
                          rice, ambergris, shark_fin, birds_nests, camphor]}}.
 {harbour, #{id => bantam, name => <<"Bantam">>, region => southeast_asia,
+            at => {-6.03, 106.16},
             character => <<"Java's pepper port, crowded with rivals, and "
                            "the Sumatran gold comes down to it.">>,
             produces => [pepper, rice, gold_ore]}}.
 {harbour, #{id => batavia, name => <<"Batavia">>, region => southeast_asia,
+            at => {-6.13, 106.81},
             character => <<"The Dutch seat. Orderly, well armed, and no "
                            "friend.">>,
             produces => [pepper, cloves, nutmeg, mace, sugar]}}.
@@ -267,35 +274,43 @@
             produces => [trepang, cloves, nutmeg, tortoiseshell,
                          sandalwood]}}.
 {harbour, #{id => ternate, name => <<"Ternate">>, region => southeast_asia,
+            at => {0.79, 127.38},
             character => <<"Cloves and nothing else, and it needs "
                            "feeding.">>,
             produces => [cloves]}}.
 {harbour, #{id => banda, name => <<"Banda">>, region => southeast_asia,
+            at => {-4.53, 129.9},
             character => <<"The only nutmeg in the world, on a few small "
                            "islands.">>,
             produces => [nutmeg, mace]}}.
 {harbour, #{id => lifau, name => <<"Lifau">>, region => southeast_asia,
+            at => {-9.2, 124.35},
             character => <<"Timor. Sandalwood, and a long way from "
                            "anywhere.">>,
             produces => [sandalwood, beeswax]}}.
 {harbour, #{id => manila, name => <<"Manila">>, region => southeast_asia,
+            at => {14.6, 120.98},
             character => <<"Makes nothing, and is rich anyway. Chinese "
                            "goods meet New World silver here.">>,
             produces => []}}.
 {harbour, #{id => jolo, name => <<"Jolo">>, region => southeast_asia,
+            at => {6.05, 121.0},
             character => <<"Sulu. Pearls, and a reputation.">>,
             produces => [pearls, birds_nests, trepang]}}.
 
 {harbour, #{id => goa, name => <<"Goa">>, region => south_asia,
+            at => {15.5, 73.91},
             character => <<"The seat of the Estado. Every Indian good "
                            "reaches it.">>,
             produces => [cotton_piece_goods, opium, saltpetre, indigo,
                          cinnamon, ivory, pearls, cowries, pepper]}}.
 {harbour, #{id => cochin, name => <<"Cochin">>, region => south_asia,
+            at => {9.97, 76.28},
             character => <<"Malabar pepper, and the older Portuguese "
                            "footing.">>,
             produces => [pepper, cinnamon, ivory, teak]}}.
 {harbour, #{id => surat, name => <<"Surat">>, region => south_asia,
+            at => {21.17, 72.83},
             character => <<"Gujarat. The cloth that clothes the trade.">>,
             produces => [cotton_piece_goods, indigo, opium, saltpetre,
                          raw_cotton, hemp, iron]}}.
@@ -304,10 +319,12 @@
             character => <<"Coromandel. Painted cloth the islands crave.">>,
             produces => [cotton_piece_goods, indigo, raw_cotton]}}.
 {harbour, #{id => colombo, name => <<"Colombo">>, region => south_asia,
+            at => {6.93, 79.86},
             character => <<"Ceylon. Cinnamon, guarded jealously.">>,
             produces => [cinnamon, pearls, ebony]}}.
 
 {harbour, #{id => hormuz, name => <<"Hormuz">>, region => west_asia,
+            at => {27.09, 56.46},
             character => <<"The gulf's gate. Horses and pearls, and heat.">>,
             produces => [horses, pearls]}}.
 
@@ -318,37 +335,45 @@
             produces => [ivory, gold, ebony, gold_ore]}}.
 
 {harbour, #{id => lisbon, name => <<"Lisbon">>, region => europe,
+            at => {38.71, -9.14},
             character => <<"Where the carreira ends and the money is.">>,
             produces => [lead, coral, broadcloth, wine,
                          glassware_and_clocks, wool, oak, iron]}}.
 {harbour, #{id => seville, name => <<"Seville">>, region => europe,
+            at => {37.39, -5.99},
             character => <<"Spain's one legal door to the Americas. The "
                            "silver only rests here.">>,
             produces => [wine, broadcloth, wool, oak]}}.
 {harbour, #{id => antwerp, name => <<"Antwerp">>, region => europe,
+            at => {51.22, 4.4},
             character => <<"The northern counting house. Spices go up the "
                            "Scheldt.">>,
             produces => [broadcloth, glassware_and_clocks, lead, wool, hemp,
                          oak]}}.
 {harbour, #{id => amsterdam, name => <<"Amsterdam">>, region => europe,
+            at => {52.37, 4.9},
             character => <<"The rival, and it pays better than it "
                            "should.">>,
             produces => [broadcloth, lead, glassware_and_clocks, wool, hemp,
                          oak, pine, iron]}}.
 
 {harbour, #{id => acapulco, name => <<"Acapulco">>, region => north_america,
+            at => {16.86, -99.88},
             character => <<"One route in, one route out, and a fortune on "
                            "it. The ore is here; the quicksilver is not.">>,
             produces => [silver_ore]}}.
 {harbour, #{id => havana, name => <<"Havana">>, region => north_america,
+            at => {23.11, -82.37},
             character => <<"Where the treasure fleets gather before the "
                            "crossing.">>,
             produces => [tobacco, sugar]}}.
 
 {harbour, #{id => bahia, name => <<"Bahia">>, region => south_america,
+            at => {-12.97, -38.51},
             character => <<"Brazil. Sugar, and the long empty Atlantic.">>,
             produces => [sugar, tobacco, brazilwood]}}.
 {harbour, #{id => callao, name => <<"Callao">>, region => south_america,
+            at => {-12.05, -77.14},
             character => <<"Lima's port. The mountain of Potosi behind it, "
                            "and a taste for silk it is not supposed to "
                            "have.">>,
@@ -488,41 +513,54 @@
 %% world's and not the sea's.
 
 {waypoint, #{id => formosa_strait, name => <<"Formosa Strait">>,
+             at => {24.5, 119.5},
              character => <<"Shallow, crowded, and blowing hard half the "
                             "year.">>}}.
 {waypoint, #{id => the_paracels, name => <<"The Paracels">>,
+             at => {16.5, 112.0},
              character => <<"Reefs that have taken more ships than any "
                             "storm in these waters.">>}}.
 {waypoint, #{id => luzon_strait, name => <<"Luzon Strait">>,
+             at => {20.5, 121.0},
              character => <<"The door between the China Sea and the "
                             "Pacific.">>}}.
 {waypoint, #{id => palawan_passage, name => <<"Palawan Passage">>,
+             at => {10.5, 118.0},
              character => <<"Inside route to the south. Slow and reefy, and "
                             "out of the worst weather.">>}}.
 {waypoint, #{id => the_kuroshio, name => <<"The Kuroshio">>,
+             at => {33.0, 140.0},
              character => <<"The black current, which carries a ship east "
                             "whether she wants it or not.">>}}.
 {waypoint, #{id => the_open_pacific, name => <<"The Open Pacific">>,
+             at => {35.0, -175.0},
              character => <<"Weeks of nothing. The longest water any ship "
                             "in this trade crosses.">>}}.
 {waypoint, #{id => andaman_sea, name => <<"Andaman Sea">>,
+             at => {10.0, 96.0},
              character => <<"Monsoon country. It decides when you sail, not "
                             "you.">>}}.
 {waypoint, #{id => laccadive_sea, name => <<"Laccadive Sea">>,
+             at => {8.0, 74.0},
              character => <<"The last easy water before the Malabar "
                             "coast.">>}}.
 {waypoint, #{id => mozambique_channel, name => <<"Mozambique Channel">>,
+             at => {-18.0, 41.0},
              character => <<"Narrow, current-ridden, and the only sensible "
                             "way round Africa.">>}}.
 {waypoint, #{id => cape_of_good_hope, name => <<"Cape of Good Hope">>,
+             at => {-34.36, 18.47},
              character => <<"Named in hope by men who had rounded it once "
                             "and lived.">>}}.
 {waypoint, #{id => st_helena, name => <<"St Helena">>,
+             at => {-15.96, -5.72},
              character => <<"A rock with water on it, in the middle of an "
                             "ocean with none.">>}}.
 {waypoint, #{id => the_doldrums, name => <<"The Doldrums">>,
+             at => {3.0, -25.0},
              character => <<"No wind at all, for as long as it likes.">>}}.
 {waypoint, #{id => the_canaries, name => <<"The Canaries">>,
+             at => {28.3, -15.6},
              character => <<"Where the trade wind picks a ship up and takes "
                             "her west.">>}}.
 

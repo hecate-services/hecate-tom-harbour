@@ -23,7 +23,9 @@
 %% @end
 -module(tom_places).
 
--export([waypoints/1,
+-export([position/2,
+         leagues/3,
+         waypoints/1,
          waypoint_ids/1,
          waypoint/2,
          is_place/2,
@@ -35,11 +37,23 @@
          legs/2,
          calls_at/3]).
 
--export_type([waypoint_id/0, waypoint/0, route_id/0, route/0, place_id/0]).
+-export_type([waypoint_id/0, waypoint/0, route_id/0, route/0, place_id/0,
+              position/0]).
+
+%% @doc Where something is, in degrees. Latitude north of the equator is
+%% positive and longitude east of Greenwich is positive, which is the only
+%% convention anybody uses and is worth saying once.
+%%
+%% A HARBOUR'S POSITION IS WHERE THE PORT IS. It has nothing whatever to do with
+%% which machine runs it: Macao is at 22 degrees north whether its process is on
+%% one box today and another tomorrow, and the box's own whereabouts never appear
+%% on this map.
+-type position() :: {number(), number()}.
 
 -type waypoint_id() :: atom().
 -type waypoint() :: #{id := waypoint_id(),
                       name := binary(),
+                      at := position(),
                       character := binary()}.
 
 -type route_id() :: atom().
@@ -52,6 +66,38 @@
 
 %% @doc Anywhere a route may name: a waypoint, or a harbour.
 -type place_id() :: waypoint_id() | tom_harbours:id().
+
+%% @doc Where a place is, whichever kind it is.
+%%
+%% A route names harbours and waters in one list, so anything asking how far it
+%% is between two points on a route has to be able to ask either kind the same
+%% question.
+-spec position(tom_world:world(), place_id()) -> {ok, position()} | {error, term()}.
+position(World, Id) ->
+    sited(waypoint(World, Id), harbour_at(World, Id)).
+
+%% @doc How far it is between two places, in leagues.
+%%
+%% THE ONE NUMBER NOBODY WROTE DOWN. A leg's length is the distance between its
+%% ends, which is a fact about the earth rather than a judgement about the game,
+%% so Macao to Nagasaki is short because it IS short and the galleon is long
+%% because the Pacific is. That is the same rule the market runs on: a price
+%% comes out of a market or it does not exist, and a distance comes off the map
+%% or it does not exist.
+%%
+%% ⚠ HOW LONG THAT TAKES IS NOT HERE AND MUST NOT COME HERE. Leagues are the
+%% map's; leagues per hour are the sea's, and they live at the port she sailed
+%% from. A world that knew how fast a ship went would be deciding the tempo of
+%% the game from a data file.
+%%
+%% Great circle, because the earth is round and the Manila galleon is nine
+%% thousand leagues of proof. A flat subtraction of longitudes would make the
+%% Pacific crossing longer than it is and would break outright at the
+%% antimeridian, which that route crosses.
+-spec leagues(tom_world:world(), place_id(), place_id()) ->
+          {ok, float()} | {error, term()}.
+leagues(World, From, To) ->
+    apart(position(World, From), position(World, To)).
 
 %% @doc Every waypoint, ordered by identifier.
 -spec waypoints(tom_world:world()) -> [waypoint()].
@@ -121,6 +167,35 @@ calls_at(World, Id, Place) ->
     lists:member(Place, maps:get(via, Route)).
 
 %% Internal
+
+sited({ok, Waypoint}, _Harbour)  -> {ok, maps:get(at, Waypoint)};
+sited({error, _}, {ok, Harbour}) -> {ok, maps:get(at, Harbour)};
+sited({error, _}, error)         -> {error, no_such_place}.
+
+harbour_at(World, Id) -> maps:find(Id, tom_world:harbours(World)).
+
+apart({ok, From}, {ok, To}) -> {ok, haversine(From, To)};
+apart({error, _} = Err, _)  -> Err;
+apart(_, {error, _} = Err)  -> Err.
+
+%% A LEAGUE IS THREE NAUTICAL MILES, 5556 metres, which is what the period meant
+%% by one at sea. The earth's mean radius is 6371 km, so it is 1146.7 leagues,
+%% and that is the only number in this file that is a convention rather than a
+%% measurement.
+%%
+%% Checked against a distance somebody can look up: Macao to Nagasaki is about
+%% 350 leagues and the Manila galleon is about 2600. A radius in the wrong unit
+%% is invisible until you compare one, because every route stays in proportion.
+-define(EARTH_LEAGUES, 1146.7).
+
+haversine({Lat1, Lng1}, {Lat2, Lng2}) ->
+    P1 = Lat1 * math:pi() / 180,
+    P2 = Lat2 * math:pi() / 180,
+    DP = (Lat2 - Lat1) * math:pi() / 180,
+    DL = (Lng2 - Lng1) * math:pi() / 180,
+    A = math:sin(DP / 2) * math:sin(DP / 2)
+        + math:cos(P1) * math:cos(P2) * math:sin(DL / 2) * math:sin(DL / 2),
+    ?EARTH_LEAGUES * 2 * math:atan2(math:sqrt(A), math:sqrt(1 - A)).
 
 found({ok, Found}, _Missing) -> {ok, Found};
 found(error, Missing)        -> {error, Missing}.

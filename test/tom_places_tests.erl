@@ -25,13 +25,49 @@ everything_is_named_and_described_test() ->
      end || Thing <- tom_places:waypoints(World) ++ tom_places:routes(World)],
     ok.
 
-%% A waypoint says where and nothing else. The moment one carries a duration,
-%% the map has started deciding what belongs to the sea.
-a_waypoint_has_no_duration_test() ->
+%% A waypoint says WHERE and nothing else, and since 2026-08-13 it says it in
+%% degrees rather than by implication. The moment one carries a duration the map
+%% has started deciding what belongs to the sea: distance is geography and comes
+%% from these two numbers, and how long that takes is the passage's business.
+a_waypoint_says_where_and_never_how_long_test() ->
     World = world(),
-    [?assertEqual([character, id, name], lists:sort(maps:keys(W)))
+    [?assertEqual([at, character, id, name], lists:sort(maps:keys(W)))
+     || W <- tom_places:waypoints(World)],
+    [?assertMatch({Lat, Lng} when is_number(Lat) andalso is_number(Lng),
+                  maps:get(at, W))
      || W <- tom_places:waypoints(World)],
     ok.
+
+%% THE CONSTANT NOBODY CAN CHECK BY EYE. Every route stays in proportion when
+%% the earth's radius is in the wrong unit, so the only way to catch it is to
+%% compare one distance with something a person can look up. Macao to Nagasaki
+%% is a little over a thousand nautical miles, which is about 350 leagues; the
+%% Manila galleon is about 7,800, which is about 2,600. Both were 80 percent too
+%% long for an hour on 2026-08-13 and every route looked perfectly plausible.
+a_league_is_three_nautical_miles_test() ->
+    World = world(),
+    {ok, Short} = tom_places:leagues(World, macao, nagasaki),
+    {ok, Galleon} = tom_places:leagues(World, manila, acapulco),
+    ?assert(Short > 330 andalso Short < 380),
+    ?assert(Galleon > 2500 andalso Galleon < 2700).
+
+%% THE ANTIMERIDIAN. Nothing in this world crosses it except the one route that
+%% matters: the Luzon Strait is 121 east and the open Pacific is 175 west, so
+%% subtracting longitudes flat would send the galleon 296 degrees the wrong way
+%% round the world, back over Asia and Africa, and make the leg four times what
+%% it is. A great circle does not care where the map is cut.
+the_galleon_crosses_the_antimeridian_test() ->
+    World = world(),
+    {ok, Leagues} = tom_places:leagues(World, luzon_strait, the_open_pacific),
+    ?assert(Leagues > 1000 andalso Leagues < 1300).
+
+%% A route names harbours and waters in one list, so both kinds answer the same
+%% question about where they are.
+either_kind_of_place_has_a_position_test() ->
+    World = world(),
+    ?assertMatch({ok, {_Lat, _Lng}}, tom_places:position(World, macao)),
+    ?assertMatch({ok, {_Lat, _Lng}}, tom_places:position(World, the_kuroshio)),
+    ?assertEqual({error, no_such_place}, tom_places:position(World, atlantis)).
 
 %% Same for a route. Which waters, in order, and nothing about how long.
 a_route_is_only_geography_test() ->
